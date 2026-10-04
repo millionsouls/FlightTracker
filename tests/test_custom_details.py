@@ -11,6 +11,7 @@ from scenes.flight.custom_details import (
     LiteralToken,
     SymbolToken,
     build_custom_spans,
+    build_custom_spans_with_static_plane,
     parse_template,
     validate_template,
 )
@@ -207,7 +208,19 @@ class TestBuildCustomSpans:
         cfg = make_cfg()
         spans = build_custom_spans("{plane}", flight, cfg)
         assert len(spans) == 1
-        assert spans[0].text == "BOEING 787-9"  # uppercased like model_spans
+        assert spans[0].text == "787-9"
+
+    def test_static_plane_is_separated_from_custom_scrolling_spans(self):
+        flight = make_flight()
+        cfg = make_cfg()
+
+        plane, spans = build_custom_spans_with_static_plane(
+            "{plane} | {callsign}", flight, cfg
+        )
+
+        assert plane is not None
+        assert plane.text == "787-9"
+        assert [span.text for span in spans] == [" | ", "BAW123"]
 
     def test_callsign_span(self):
         flight = make_flight()

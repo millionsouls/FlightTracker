@@ -416,16 +416,36 @@ def _resolve_unit(field: str, requested_unit: str | None, cfg: Config) -> str:
 
 
 def build_custom_spans(template: str, flight: Flight, cfg: Config) -> Spans:
-    """Convert a template string into a ``Spans`` list for the Scroller.
+    """Convert a template string into spans for the plane-details scroller."""
+    spans, _static_plane = _build_custom_spans(
+        template, flight, cfg, separate_plane=False
+    )
+    return spans
 
-    If the template is empty or all fields resolve to empty strings, returns
-    a single span with the ``<custom scroller not defined>`` warning.
-    """
+
+def build_custom_spans_with_static_plane(
+    template: str, flight: Flight, cfg: Config
+) -> tuple[Span | None, Spans]:
+    """Return the first ``{plane}`` span separately from the scrolling spans."""
+    spans, static_plane = _build_custom_spans(
+        template, flight, cfg, separate_plane=True
+    )
+    return static_plane, spans
+
+
+def _build_custom_spans(
+    template: str,
+    flight: Flight,
+    cfg: Config,
+    *,
+    separate_plane: bool,
+) -> tuple[Spans, Span | None]:
     if not template or not template.strip():
-        return [Span(TC(THEME_PLANE), fonts.regular, NOT_DEFINED_TEXT)]
+        return [Span(TC(THEME_PLANE), fonts.regular, NOT_DEFINED_TEXT)], None
 
     tokens = parse_template(template)
     spans: Spans = []
+    static_plane: Span | None = None
 
     for token in tokens:
         if isinstance(token, LiteralToken):
@@ -434,15 +454,14 @@ def build_custom_spans(template: str, flight: Flight, cfg: Config) -> Spans:
 
         elif isinstance(token, FieldToken):
             field_spans = _build_field_spans(token, flight, cfg)
-            spans.extend(field_spans)
+            if separate_plane and token.field == "plane":
+                if static_plane is None and field_spans:
+                    static_plane = field_spans[0]
+            else:
+                spans.extend(field_spans)
 
         elif isinstance(token, SymbolToken):
             if token.name == "heading_arrow":
-                # Dynamic symbol: select glyph based on flight heading.
-                # Use floor(x + 0.5) instead of round() because Python's
-                # round() uses banker's rounding (round half to even),
-                # which gives wrong results at the .5 boundaries
-                # (e.g. 22.5° should be NE, not N).
                 heading = flight.heading or 0
                 index = int(math.floor(heading / 45.0 + 0.5)) % 8
                 glyph = HEADING_ARROW_GLYPHS[index]
@@ -450,9 +469,6 @@ def build_custom_spans(template: str, flight: Flight, cfg: Config) -> Spans:
                     colour = _resolve_colour(token.colour, THEME_PLANE_TLM_UNITS)
                     spans.append(Span(colour, fonts.small_symbols, glyph))
             elif token.name == "heading_direction":
-                # Dynamic text tag: select cardinal direction text (N, NE,
-                # E, ...) based on flight heading.  Same rounding math as
-                # heading_arrow to avoid banker's rounding at .5 boundaries.
                 heading = flight.heading or 0
                 index = int(math.floor(heading / 45.0 + 0.5)) % 8
                 text = HEADING_ARROW_DIRECTIONS[index]
@@ -464,11 +480,10 @@ def build_custom_spans(template: str, flight: Flight, cfg: Config) -> Spans:
                     colour = _resolve_colour(token.colour, THEME_PLANE_TLM_UNITS)
                     spans.append(Span(colour, fonts.small_symbols, glyph))
 
-    # If all spans are empty or the list is empty, show the warning.
-    if not spans or all(s.text == "" for s in spans):
-        return [Span(TC(THEME_PLANE), fonts.regular, NOT_DEFINED_TEXT)]
+    if (not spans or all(span.text == "" for span in spans)) and static_plane is None:
+        spans = [Span(TC(THEME_PLANE), fonts.regular, NOT_DEFINED_TEXT)]
 
-    return spans
+    return spans, static_plane
 
 
 def _build_field_spans(token: FieldToken, flight: Flight, cfg: Config) -> Spans:
@@ -483,18 +498,9 @@ def _build_field_spans(token: FieldToken, flight: Flight, cfg: Config) -> Spans:
         colour = _resolve_colour(token.colour, THEME_PLANE)
         # Text fields use regular font; plane model is uppercased to match
         # the existing model_spans() behaviour.
-        if token.field in TEXT_FIELDS:
-            text = str(raw_value) if raw_value else ""
-            if not text:
-                return []
-            colour = _resolve_colour(token.colour, THEME_PLANE)
-            # Text fields use regular font; plane model is uppercased to match
-            # the existing model_spans() behaviour.
-            if token.field == "plane":
-                # Skip first word if space exists (e.g., "Boeing 747" -> "747")
-                text = text.split(maxsplit=1)[1] if ' ' in text else text
-                text = text.upper()
-            return [Span(colour, fonts.regular, text)]
+        if token.field == "plane":
+            text = text.split()[-1]  # Get last part
+            text = text.upper()
         return [Span(colour, fonts.regular, text)]
 
     # Telemetry fields - value + optional unit suffix.

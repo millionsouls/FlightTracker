@@ -81,8 +81,16 @@ def _to_aircraft(record: dict) -> AircraftInfo | None:
     from utilities.overhead_utilities import clean_field
 
     registration = clean_field(record.get("reg"))
-    plane = clean_field(record.get("type"))  # ICAO type code, e.g. A20N
+    plane = clean_field(record.get("type"))  # Could be ICAO or full name
     operator = clean_operator_code(record.get("painted_as"))
+    
+    logger.debug("Raw aircraft type: %s", plane)
+    
+    # Extract ICAO code if full name provided
+    plane = _extract_icao_code(plane) if plane else None
+    
+    logger.debug("Normalized aircraft type: %s", plane)
+    
     if not (registration or plane or operator):
         return None
     return AircraftInfo(
@@ -90,3 +98,28 @@ def _to_aircraft(record: dict) -> AircraftInfo | None:
         registration=registration,
         operator_icao=operator,
     )
+
+
+def _extract_icao_code(aircraft_type: str) -> str | None:
+    """Extract ICAO code from aircraft type string.
+    
+    Examples:
+        "A20N" -> "A20N" (already ICAO)
+        "Airbus A320neo" -> "A320" (extract code)
+        "Boeing 747" -> "B744" or similar (try to match)
+    """
+    aircraft_type = aircraft_type.strip()
+    
+    # Already looks like ICAO (short, no spaces)
+    if len(aircraft_type) <= 4 and ' ' not in aircraft_type:
+        return aircraft_type
+    
+    # Try to extract known patterns
+    import re
+    match = re.search(r'\b([AB]\d{2}[A-Z0-9]?)\b', aircraft_type)
+    if match:
+        return match.group(1)
+    
+    # Return original if can't parse
+    logger.warning("Could not normalize aircraft type: %s", aircraft_type)
+    return aircraft_type

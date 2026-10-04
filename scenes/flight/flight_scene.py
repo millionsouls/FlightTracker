@@ -27,7 +27,11 @@ from display.scroller import Scroller
 from display.spans import Span, Spans
 from scenes.flight.airline_logo import AirlineLogoWidget, NullWidget
 from scenes.flight.callsign_bar import make_callsign_bar
-from scenes.flight.custom_details import build_custom_spans, format_number
+from scenes.flight.custom_details import (
+    build_custom_spans,
+    build_custom_spans_with_static_plane,
+    format_number,
+)
 from scenes.flight.journey import make_label
 from setup import fonts, screen
 from setup.configuration import Config
@@ -149,6 +153,7 @@ class FlightScene:
         # Plane details state
         self.details_scroller: Scroller | None = None
         self.details_spans: Spans | None = None
+        self.details_static_span: Span | None = None
         self.last_details_mode: int | None = None
 
         # Error backoff - log once, hold off before retrying
@@ -403,18 +408,50 @@ class FlightScene:
     def draw_plane_details(self) -> None:
         cfg = Config.instance()
         current_mode = cfg.details
-        spans = self.build_spans(cfg)
+        static_plane = None
+        if current_mode == 2:
+            static_plane, spans = build_custom_spans_with_static_plane(
+                cfg.details_custom_template,
+                self.flights[self.flight_index],
+                cfg,
+            )
+        else:
+            spans = self.build_spans(cfg)
 
-        if self.details_scroller is None or current_mode != self.last_details_mode:
+        if self.details_static_span != static_plane:
+            if self.details_static_span is not None:
+                previous = self.details_static_span
+                self.panel.draw_text(
+                    self.canvas,
+                    previous.font,
+                    0,
+                    PLANE_DETAILS_Y + 1,
+                    TC(THEME_BG),
+                    previous.text,
+                )
+            self.details_static_span = static_plane
+
+        scroll_x = min(
+            static_plane.width + 1 if static_plane is not None else 0,
+            screen.WIDTH - 1,
+        )
+        scroll_width = screen.WIDTH - scroll_x
+
+        if (
+            self.details_scroller is None
+            or current_mode != self.last_details_mode
+            or self.details_scroller.x != scroll_x
+            or self.details_scroller.width != scroll_width
+        ):
             if self.details_scroller is not None:
                 self.details_scroller.clear()
 
             self.details_scroller = Scroller(
                 self.panel,
                 self.canvas,
-                0,
+                scroll_x,
                 PLANE_DETAILS_Y,
-                screen.WIDTH,
+                scroll_width,
                 spans,
                 bounce=False,
             )
@@ -428,6 +465,17 @@ class FlightScene:
 
         previous_loop_count = self.details_scroller.loop_count
         self.details_scroller.draw()
+
+        if self.details_static_span is not None:
+            static_plane = self.details_static_span
+            self.panel.draw_text(
+                self.canvas,
+                static_plane.font,
+                0,
+                PLANE_DETAILS_Y + 1,
+                static_plane.colour,
+                static_plane.text,
+            )
 
         if (
             self.details_scroller.loop_count > previous_loop_count

@@ -28,6 +28,7 @@ from scenes.flight.journey.short_label import (
     _display_code,
 )
 from utilities.flight import Flight
+from setup import screen
 
 # ---------------------------------------------------------------------------
 # callsigns_match
@@ -883,7 +884,70 @@ class TestBuildSpans:
         spans = scene.build_spans(cfg)
         texts = [s.text for s in spans if s.text]
         assert "BAW123" in texts
-        assert "BOEING 787" in texts
+        assert "787" in texts
+
+    def test_mode_2_keeps_plane_static_and_scrolls_remaining_template(self):
+        from scenes.flight.flight_scene import PLANE_DETAILS_Y
+
+        scene = self._make_scene([Flight(plane="Boeing 787", callsign="BAW123")])
+        cfg = MagicMock()
+        cfg.details = 2
+        cfg.details_custom_template = "{plane} | {callsign}"
+        scroller = MagicMock()
+        scroller.loop_count = 0
+
+        with patch("scenes.flight.flight_scene.Config.instance", return_value=cfg):
+            with patch(
+                "scenes.flight.flight_scene.Scroller", return_value=scroller
+            ) as scroller_factory:
+                scene.draw_plane_details()
+
+        static_plane = scene.details_static_span
+        assert static_plane is not None
+        assert static_plane.text == "787"
+        assert scene.panel.draw_text.call_args.args == (
+            scene.canvas,
+            static_plane.font,
+            0,
+            PLANE_DETAILS_Y + 1,
+            static_plane.colour,
+            "787",
+        )
+        args = scroller_factory.call_args.args
+        assert args[2] == static_plane.width + 1
+        assert args[4] == screen.WIDTH - args[2]
+        assert [span.text for span in args[5]] == [" | ", "BAW123"]
+
+    def test_mode_2_scrolls_long_plane_inside_fixed_width_slot(self):
+        from scenes.flight.flight_scene import PLANE_DETAILS_Y, PLANE_TYPE_MAX_WIDTH
+
+        scene = self._make_scene(
+            [Flight(plane="Airbus A350-1000", callsign="BAW123")]
+        )
+        cfg = MagicMock()
+        cfg.details = 2
+        cfg.details_custom_template = "{plane} | {callsign}"
+        plane_scroller = MagicMock()
+        plane_scroller.loop_count = 0
+        details_scroller = MagicMock()
+        details_scroller.loop_count = 0
+
+        with patch("scenes.flight.flight_scene.Config.instance", return_value=cfg):
+            with patch(
+                "scenes.flight.flight_scene.Scroller",
+                side_effect=[plane_scroller, details_scroller],
+            ) as scroller_factory:
+                scene.draw_plane_details()
+
+        plane_args = scroller_factory.call_args_list[0].args
+        assert plane_args[2] == 0
+        assert plane_args[3] == PLANE_DETAILS_Y + 1
+        assert plane_args[4] == PLANE_TYPE_MAX_WIDTH
+        assert [span.text for span in plane_args[5]] == ["A350-1000"]
+
+        details_args = scroller_factory.call_args_list[1].args
+        assert details_args[2] == PLANE_TYPE_MAX_WIDTH + 1
+        assert [span.text for span in details_args[5]] == [" | ", "BAW123"]
 
     def test_mode_2_empty_template_returns_warning(self):
         from scenes.flight.custom_details import NOT_DEFINED_TEXT

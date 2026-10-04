@@ -1041,7 +1041,7 @@ class TestJourneyCodeDisplay:
 
     # -- full-name label prefix spans --
 
-    def test_full_label_spans_convert_prefix(self):
+    def test_full_label_spans_include_scrollable_arrows_and_names(self):
         from scenes.flight.journey.full_label import build_journey_spans
 
         cfg = self._cfg(airport_code_format="icao")
@@ -1051,18 +1051,54 @@ class TestJourneyCodeDisplay:
             origin_name="Glasgow Airport",
             destination_name="Heathrow Airport",
         )
-        origin_spans, dest_spans = build_journey_spans(cfg, flight, icon_required=True)
-        assert origin_spans[0].text == "EGPF"
-        assert dest_spans[0].text == "EGLL"
+        origin_spans, dest_spans = build_journey_spans(cfg, flight)
+        assert [span.text for span in origin_spans] == [">", "Glasgow Airport"]
+        assert [span.text for span in dest_spans] == ["<", "Heathrow Airport"]
 
     def test_full_label_spans_iata_unchanged(self):
         from scenes.flight.journey.full_label import build_journey_spans
 
         cfg = self._cfg()
         flight = Flight(origin="GLA", destination="LHR")
-        origin_spans, dest_spans = build_journey_spans(cfg, flight, icon_required=True)
-        assert origin_spans[0].text == "GLA"
-        assert dest_spans[0].text == "LHR"
+        origin_spans, dest_spans = build_journey_spans(cfg, flight)
+        assert [span.text for span in origin_spans] == [">", "Unknown"]
+        assert [span.text for span in dest_spans] == ["<", "Unknown"]
+
+    def test_full_label_keeps_icao_codes_static_with_airline_icon(self):
+        from scenes.flight.journey.full_label import FullNameLabel
+        from setup.configuration import Config
+
+        cfg = self._cfg(airport_display_style=1, airport_code_format="icao")
+        flight = Flight(
+            origin="GLA",
+            destination="LHR",
+            origin_name="Glasgow Airport",
+            destination_name="Heathrow Airport",
+        )
+        panel, canvas = _make_panel_and_canvas()
+        panel.draw_text.side_effect = lambda *args, **kwargs: len(args[-1]) * 5
+        label = FullNameLabel(panel)
+        scroller = MagicMock()
+        scroller.scroll_max = 0
+        scroller.all_looped.return_value = True
+
+        with patch.object(Config, "instance", return_value=cfg):
+            with patch(
+                "scenes.flight.journey.full_label.Scroller", return_value=scroller
+            ) as scroller_factory:
+                label.draw(canvas, flight, 17, 47, icon_required=True)
+
+        drawn_text = [call.args[-1] for call in panel.draw_text.call_args_list]
+        assert "EGPF" in drawn_text
+        assert "EGLL" in drawn_text
+        origin_scroll = scroller_factory.call_args_list[0].args
+        destination_scroll = scroller_factory.call_args_list[1].args
+        assert origin_scroll[2] == 37
+        assert destination_scroll[2] == 37
+        assert [span.text for span in origin_scroll[5]] == [">", "Glasgow Airport"]
+        assert [span.text for span in destination_scroll[5]] == ["<", "Heathrow Airport"]
+        assert ">" not in drawn_text
+        assert "<" not in drawn_text
 
     # -- scene redraw key: flipping the format must reset the label --
 

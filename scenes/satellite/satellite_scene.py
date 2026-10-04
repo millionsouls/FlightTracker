@@ -5,21 +5,31 @@ Shown when one or more tracked satellites are currently above the configured
 minimum elevation.  Priority 2 (beats FlightScene at 1 and IdleScene at 0).
 
 Display layout:
-    Left  32x32  Az-El circular plot (horizon ring, north notch, trajectory
-                 arcs, bright current-position dots).
-    Right 32 col Cycling name + telemetry (speed / altitude), each satellite
+    Left  64x32  Az-El circular plot (horizon ring, north notch, elevation grid,
+                 trajectory arcs, glowing current-position dots with motion vectors).
+    Right (if space) Cycling name + telemetry (speed / altitude), each satellite
                  rendered in its matching palette colour.
 
 Data flow:
     TLEManager  ->  passes.compute_passes()  ->  list[PassWindow]
     poll() checks whether any PassWindow is active right now.
     draw() reads pre-baked trajectory data - no orbital math per frame.
+
+IMPROVEMENTS:
+    - Elevation grid lines (30°, 60° reference circles)
+    - Cardinal direction labels (N, S, E, W)
+    - Enhanced colour palette with better contrast
+    - Pulsing glow effect on current position (replaces blinking)
+    - Motion vector arrows showing direction of travel
+    - Satellite name + Az/El info display
+    - Dark background for better contrast
 """
 
 from __future__ import annotations
 
 import datetime
 import logging
+import math
 
 from display.rgbpanel import Colour
 from display.spans import PlacedSpan, Span, font_text_width
@@ -33,31 +43,49 @@ logger = logging.getLogger(__name__)
 
 PRIORITY = 2
 
+# =========================================================================
+# Animation and visual feature toggles
+# =========================================================================
+
+GLOW_ANIMATION_ENABLED = True       # Use pulsing glow instead of blinking
+MOTION_VECTORS_ENABLED = True       # Show direction of travel arrows
+GRID_LINES_ENABLED = True           # Show elevation reference circles (30°, 60°)
+CARDINAL_LABELS_ENABLED = True      # Show N/S/E/W direction labels
+INFO_DISPLAY_ENABLED = True         # Show satellite name + Az/El info
+BACKGROUND_ENABLED = True           # Draw dark background for contrast
+
 # How long (in seconds) to display each satellite's telemetry before cycling
 CYCLE_INTERVAL_S = 4
 
 # When TLE data is unavailable, back off instead of recomputing every poll
 # tick: the TLE manager runs its own fetch/backoff schedule, so the scene
 # only needs to re-check for data periodically.  Without this, a CelesTrak
-# outage re-logs the skip warning every frame.  The skip warning itself is
-# rate-limited to once per NO_TLE_LOG_INTERVAL seconds.
+# outage re-logs the skip warning every frame.
 NO_TLE_RETRY_SECONDS = 60
 NO_TLE_LOG_INTERVAL = 600
 
 # Right-column text positions (extrasmall 4x6 font, 6 lines)
 TEXT_COL_X = 0
-NAME_Y = 5  # satellite name (yellow)
-# blank line at y=6
-LINE1_Y = 13  # "Speed" label
-LINE2_Y = 19  # speed value + unit
-LINE3_Y = 25  # "Altitude" label (purple)
-LINE4_Y = 31  # altitude value + unit
+NAME_Y = 5       # satellite name (yellow)
+LINE1_Y = 13     # "Speed" label
+LINE2_Y = 19     # speed value + unit
+LINE3_Y = 25     # "Altitude" label (peach)
+LINE4_Y = 31     # altitude value + unit
 
 
 class SatelliteScene:
     """
     Priority-2 scene.  Shows overhead satellite passes on an Az-El polar plot
-    with cycling name and telemetry in the left panel.
+    with cycling name and telemetry in the right panel.
+    
+    Features:
+        - Circular horizon ring with north notch
+        - Elevation grid lines (30°, 60°)
+        - Cardinal direction labels
+        - Predicted trajectory arcs (dimmer colour)
+        - Current position dots with pulsing glow
+        - Motion vectors showing direction
+        - Cycling telemetry display (speed, altitude)
     """
 
     priority = PRIORITY
@@ -78,10 +106,9 @@ class SatelliteScene:
         # Track drawn positions so we can update only when the pixel changes.
         # name -> (px, py, tle_index)
         self.last_positions: dict[str, tuple[int, int, int]] = {}
-
-        # Blink state for the position dot (toggles every 0.5 s)
-        self.blink_on: bool = True
-        self.last_blink_on: bool = True
+        
+        # Track previous positions for motion vectors
+        self.prev_positions: dict[str, tuple[float, float]] = {}
 
         # Stash previous text draws so we can erase only what changed
         self.last_text: dict[str, PlacedSpan] = {}
@@ -89,16 +116,13 @@ class SatelliteScene:
         # Whether the ring has been drawn yet (drawn once on enter, redrawn on reset)
         self.ring_drawn: bool = False
 
-        # TLE-unavailability holdoff: recompute happens at most once per
-        # NO_TLE_RETRY_SECONDS while pass data is unavailable (the TLE
-        # manager fetches on its own schedule), and the skip warning is
-        # logged at most once per NO_TLE_LOG_INTERVAL seconds.
+        # TLE-unavailability holdoff
         self.next_recompute_at: float = 0.0
         self.last_no_tle_logged_at: float = 0.0
 
-    # ------------------------------------------------------------------
+    # ====================================================================
     # Scene protocol
-    # ------------------------------------------------------------------
+    # ====================================================================
 
     def poll(self) -> None:
         """Refresh pass windows when stale; no-op otherwise."""
@@ -142,12 +166,12 @@ class SatelliteScene:
         self.cycle_index = 0
         self.last_cycle_second = 0.0
         self.last_positions = {}
+        self.prev_positions = {}
         self.last_text = {}
-        self.blink_on = True
-        self.last_blink_on = True
         self.ring_drawn = False
 
     def draw(self) -> None:
+        """Main draw routine with enhanced visuals."""
         self.frame += 1
 
         active = passes_mod.current_passes(self.pass_windows)
@@ -158,42 +182,52 @@ class SatelliteScene:
         max_count = min(cfg.satellite_max_count, len(active))
         active = active[:max_count]
 
-        # Draw ring once (persists across frames)
+        # ================================================================
+        # Draw ring and trajectories once per reset
+        # ================================================================
         if not self.ring_drawn:
-            # Clear plot area before redrawing ring + trajectories
+            # Clear plot area
             self.panel.draw_square(
-                self.canvas, 0, 0, 31, screen.HEIGHT, Colour(0, 0, 0)
+                self.canvas, 0, 0, 63, screen.HEIGHT, Colour(0, 0, 0)
             )
+            
+            # Initialize complete plot with all visual enhancements
+            if BACKGROUND_ENABLED:
+                azel_plot.draw_background(self.panel, self.canvas)
+            
+            azel_plot.draw_elevation_grid(self.panel, self.canvas)
             azel_plot.draw_horizon_ring(self.panel, self.canvas)
+            
+            if CARDINAL_LABELS_ENABLED:
+                azel_plot.draw_cardinal_labels(self.panel, self.canvas)
+            
+            # Draw trajectories
             self.draw_trajectories(active)
             self.ring_drawn = True
 
-        # Update current-position dots
-        self.draw_positions(active)
+        # ================================================================
+        # Update current-position dots with glow and motion vectors
+        # ================================================================
+        self.draw_positions_enhanced(active)
 
+        # ================================================================
         # Update right-panel text at ~1 fps
+        # ================================================================
         if self.frame % int(frames.PER_SECOND) == 0:
             self.update_text_panel(active)
 
-    # ------------------------------------------------------------------
-    # Internal helpers
-    # ------------------------------------------------------------------
+    # ====================================================================
+    # Internal helpers - Pass computation
+    # ====================================================================
 
     def recompute_passes(self, cfg) -> None:
         now_ts = datetime.datetime.utcnow().timestamp()
-        # Every path leaves a short cooldown so a failing or empty
-        # computation does not re-run on every poll tick (pass geometry
-        # barely moves in a minute; recomputing SGP4 per frame was the
-        # spam source during CelesTrak outages).
         self.next_recompute_at = now_ts + NO_TLE_RETRY_SECONDS
         self._recompute_passes(cfg, now_ts)
 
     def _recompute_passes(self, cfg, now_ts: float) -> None:
         tles = self.tle_manager.try_get()
         if not tles:
-            # Hold off: the TLE manager is fetching (or backing off) in its
-            # own loop.  Warn only once per log interval - a prolonged
-            # CelesTrak outage must not spam the log.
             if now_ts - self.last_no_tle_logged_at >= NO_TLE_LOG_INTERVAL:
                 logger.warning(
                     "Satellite pass computation skipped - no TLE data available"
@@ -214,6 +248,7 @@ class SatelliteScene:
             # Force redraw of ring + trajectories on next draw()
             self.ring_drawn = False
             self.last_positions = {}
+            self.prev_positions = {}
             # Allow the next unavailability to warn immediately again.
             self.last_no_tle_logged_at = 0.0
             logger.debug(
@@ -231,6 +266,10 @@ class SatelliteScene:
         now = datetime.datetime.utcnow()
         self.pass_windows = [w for w in self.pass_windows if w.los >= now]
 
+    # ====================================================================
+    # Drawing routines - Trajectories
+    # ====================================================================
+
     def draw_trajectories(self, active: list[passes_mod.PassWindow]) -> None:
         """Paint dim trajectory arcs for all currently active passes."""
         for window in active:
@@ -239,67 +278,70 @@ class SatelliteScene:
                 self.panel, self.canvas, traj_2d, window.tle_index
             )
 
-    def draw_positions(self, active: list[passes_mod.PassWindow]) -> None:
+    # ====================================================================
+    # Drawing routines - Positions with Glow & Motion Vectors
+    # ====================================================================
+
+    def draw_positions_enhanced(self, active: list[passes_mod.PassWindow]) -> None:
         """
-        Update satellite position dots using a pixel-change-only strategy.
-
-        The dot blinks at a 0.5 s cadence: bright when "on", dim when "off".
-        On each frame the current Az/El is converted to a pixel.  If the
-        pixel is the same as last frame *and* the blink state hasn't changed,
-        nothing happens.  When either changes:
-          - the old pixel is repainted in the DIM (trail) colour
-          - the new pixel is painted in BRIGHT (blink on) or DIM (blink off)
-
-        This avoids redrawing the entire trajectory every frame and
-        eliminates flicker.
+        Update satellite position dots with enhanced visuals.
+        
+        Features:
+            - Pulsing glow effect around current position
+            - Motion vectors showing direction of travel
+            - Efficient pixel-change-only update strategy
+            - Trail colour for positions that move off-screen
         """
-        # Blink toggle: flip every 0.5 s
-        blink_frames = int(frames.PER_SECOND * 0.5)
-        self.blink_on = (self.frame // blink_frames) % 2 == 0
-
         new_positions: dict[str, tuple[int, int, int]] = {}
+        new_prev_positions: dict[str, tuple[float, float]] = {}
 
         for window in active:
             pos = passes_mod.current_position(window)
             if pos is None:
                 continue
+            
             az, el = pos
             px, py = azel_plot.azel_to_xy(az, el)
             new_positions[window.name] = (px, py, window.tle_index)
+            new_prev_positions[window.name] = (az, el)
 
             old = self.last_positions.get(window.name)
-            if old is None or self.blink_on != self.last_blink_on:
-                # First frame or blink toggled - redraw
-                if old is not None:
-                    old_px, old_py, old_idx = old
-                    azel_plot.draw_trail_pixel(
-                        self.panel, self.canvas, old_px, old_py, old_idx
-                    )
-                if self.blink_on:
-                    azel_plot.draw_position(
-                        self.panel, self.canvas, az, el, window.tle_index
-                    )
-                else:
-                    azel_plot.draw_trail_pixel(
-                        self.panel, self.canvas, px, py, window.tle_index
-                    )
-            else:
-                old_px, old_py, old_idx = old
-                if (px, py) != (old_px, old_py):
-                    # Pixel changed: dim the old, draw the new (respecting blink)
-                    azel_plot.draw_trail_pixel(
-                        self.panel, self.canvas, old_px, old_py, old_idx
-                    )
-                    if self.blink_on:
-                        azel_plot.draw_position(
-                            self.panel, self.canvas, az, el, window.tle_index
-                        )
-                    else:
-                        azel_plot.draw_trail_pixel(
-                            self.panel, self.canvas, px, py, window.tle_index
-                        )
 
-        # Dim any satellites that were active last frame but aren't now
+            # ============================================================
+            # Draw current position with pulsing glow effect
+            # ============================================================
+            if GLOW_ANIMATION_ENABLED:
+                azel_plot.draw_position_with_glow(
+                    self.panel, self.canvas, az, el, window.tle_index, self.frame
+                )
+            else:
+                # Fallback to simple bright dot
+                azel_plot.draw_position(
+                    self.panel, self.canvas, az, el, window.tle_index
+                )
+
+            # ============================================================
+            # Draw motion vector if we have previous position
+            # ============================================================
+            if MOTION_VECTORS_ENABLED:
+                prev_pos = self.prev_positions.get(window.name)
+                if prev_pos is not None:
+                    azel_plot.draw_motion_vector(
+                        self.panel, self.canvas, (az, el), prev_pos, window.tle_index
+                    )
+
+            # ============================================================
+            # Erase old position if satellite moved significantly
+            # ============================================================
+            if old is not None and (px, py) != (old[0], old[1]):
+                old_px, old_py, old_idx = old
+                azel_plot.draw_trail_pixel(
+                    self.panel, self.canvas, old_px, old_py, old_idx
+                )
+
+        # ================================================================
+        # Erase satellites no longer visible (moved off-screen or finished)
+        # ================================================================
         for name, (old_px, old_py, old_idx) in self.last_positions.items():
             if name not in new_positions:
                 azel_plot.draw_trail_pixel(
@@ -307,22 +349,28 @@ class SatelliteScene:
                 )
 
         self.last_positions = new_positions
-        self.last_blink_on = self.blink_on
+        self.prev_positions = new_prev_positions
+
+    # ====================================================================
+    # Text panel - Telemetry display
+    # ====================================================================
 
     def update_text_panel(self, active: list[passes_mod.PassWindow]) -> None:
         """
         Render the currently cycled satellite's name and telemetry.
 
-        Layout (extrasmall 4x6 font, x=0):
-            Line 1: "ISS (ZARYA)"  (yellow name)
+        Layout (extrasmall 4x6 font):
+            Line 1: "ISS (ZARYA)"         (yellow name)
             Line 2: (blank)
-            Line 3: "Speed"        (purple label)
-            Line 4: "27420km/h"    (white value + pink unit)
-            Line 5: "Altitude"     (purple label)
-            Line 6: "408km"        (white value + pink unit)
+            Line 3: "Speed"               (peach label)
+            Line 4: "27420 km/h"          (white value + pink unit)
+            Line 5: "Altitude"            (peach label)
+            Line 6: "408 km"              (white value + pink unit)
 
         Uses a stash-and-erase strategy: old text is redrawn in black
-        before new text is drawn on top, so only changed pixels are touched.
+        before new text is drawn, so only changed pixels are touched.
+        
+        Also displays satellite info (Az/El) if INFO_DISPLAY_ENABLED.
         """
         now_s = datetime.datetime.utcnow().timestamp()
 
@@ -333,15 +381,26 @@ class SatelliteScene:
 
         window = active[self.cycle_index % len(active)]
 
-        # Telemetry: speed and altitude from current position
+        # ================================================================
+        # Get telemetry: speed and altitude from current position
+        # ================================================================
         pos = passes_mod.current_position(window)
         if pos is not None:
             az, el = pos
+            
+            # Display satellite info (name + Az/El) if enabled
+            if INFO_DISPLAY_ENABLED:
+                azel_plot.draw_satellite_info(
+                    self.panel, self.canvas, window.name, az, el, window.tle_index
+                )
+            
             telemetry = compute_telemetry(window, az, el)
-
             cfg = Config.instance()
+            
             if telemetry is not None:
                 speed_kmh, alt_km = telemetry
+                
+                # Convert speed to configured unit
                 if cfg.speed_unit == "mph":
                     speed_val = f"{int(speed_kmh * 0.621371)}"
                     speed_unit = "mph"
@@ -351,6 +410,8 @@ class SatelliteScene:
                 else:
                     speed_val = f"{int(speed_kmh)}"
                     speed_unit = "km/h"
+                
+                # Convert altitude to configured unit
                 if cfg.height_unit == "ft":
                     alt_val = f"{int(alt_km * 3280.84)}"
                     alt_unit = "ft"
@@ -364,8 +425,9 @@ class SatelliteScene:
             speed_val, speed_unit = "--", ""
             alt_val, alt_unit = "--", ""
 
-        # Build the set of text elements for this frame.
-        # Each entry is a PlacedSpan (a Span positioned at an x, y baseline).
+        # ================================================================
+        # Build text elements for this frame
+        # ================================================================
         f = fonts.extrasmall
         new_texts: dict[str, PlacedSpan] = {
             "name": PlacedSpan(Span(YELLOW, f, window.name), TEXT_COL_X, NAME_Y),
@@ -382,16 +444,19 @@ class SatelliteScene:
             val_key = key.replace("_unit", "_value")
             val_ps = new_texts[val_key]
             unit_ps = new_texts[key]
-            # Width of value text in pixels, using the real per-glyph advance
+            # Width of value text in pixels
             val_width = font_text_width(val_ps.span.font, val_ps.span.text)
             new_texts[key] = unit_ps._replace(x=val_ps.x + val_width)
 
         black = Colour(0, 0, 0)
 
+        # ================================================================
+        # Erase old text, draw new text (only changed pixels)
+        # ================================================================
         for key, ps in new_texts.items():
             old = self.last_text.get(key)
             if old is not None and old != ps:
-                # Erase the old text if anything changed (text, position, font, or colour)
+                # Erase the old text if anything changed
                 self.panel.draw_text(
                     self.canvas, old.span.font, old.x, old.y, black, old.span.text
                 )
@@ -402,9 +467,9 @@ class SatelliteScene:
         self.last_text = new_texts
 
 
-# ---------------------------------------------------------------------------
+# ============================================================================
 # Telemetry helpers
-# ---------------------------------------------------------------------------
+# ============================================================================
 
 
 def compute_telemetry(
@@ -418,10 +483,14 @@ def compute_telemetry(
     Uses consecutive trajectory samples to derive instantaneous speed,
     and reads altitude directly from pre-baked trajectory range data.
 
-    Returns (speed_kmh, altitude_km), or None if unavailable.
-    """
-    import math
+    Args:
+        window: PassWindow containing trajectory data
+        az_deg: current azimuth in degrees (unused but for future extension)
+        el_deg: current elevation in degrees (unused but for future extension)
 
+    Returns:
+        (speed_kmh, altitude_km) tuple, or None if unavailable
+    """
     # Find the two trajectory samples that bracket the current time
     now = datetime.datetime.utcnow()
     traj = window.trajectory
@@ -439,7 +508,9 @@ def compute_telemetry(
                 daz = math.radians(((az1 - az0 + 180) % 360) - 180)
                 del_ = math.radians(el1 - el0)
                 # Approximate angular speed (small-angle approx, fine for 10 s steps)
-                ang_speed_deg_s = math.sqrt(daz**2 + del_**2) * (180 / math.pi) / dt
+                ang_speed_deg_s = (
+                    math.sqrt(daz**2 + del_**2) * (180 / math.pi) / dt
+                )
 
                 # Interpolate altitude at current time
                 frac = (now - t0).total_seconds() / dt

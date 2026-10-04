@@ -65,7 +65,7 @@ def _resolve_name(
 
 
 def build_journey_spans(
-    cfg: Config, flight: Flight, icon_required: bool = False
+    cfg: Config, flight: Flight
 ) -> tuple[Spans, Spans]:
     style = cfg.airport_display_style
     origin_name = _resolve_name(
@@ -80,44 +80,23 @@ def build_journey_spans(
     )
 
     font = fonts.small_symbols
-    origin = journey_display_code(flight.origin or cfg.journey_blank_filler, cfg)
-    destination = journey_display_code(
-        flight.destination or cfg.journey_blank_filler, cfg
-    )
-
-    if icon_required:
-        # The entire [code][arrow][name] line scrolls as one unit.
-        origin_spans: Spans = [
-            Span(TC(THEME_LOCATION_ORIGIN), font, origin),
-            Span(TC(THEME_LOCATION_ORIGIN_ARROW), font, ">"),
-            Span(TC(THEME_LOCATION_ORIGIN_FULL), font, f"{origin_name or 'Unknown'}"),
-        ]
-        destination_spans: Spans = [
-            Span(TC(THEME_LOCATION_DESTINATION), font, destination),
-            Span(TC(THEME_LOCATION_DESTINATION_ARROW), font, "<"),
-            Span(
-                TC(THEME_LOCATION_DESTINATION_FULL),
-                font,
-                f"{destination_name or 'Unknown'}",
-            ),
-        ]
-    else:
-        # Only the name scrolls; the code+arrow prefix is drawn statically.
-        origin_spans = [
-            Span(TC(THEME_LOCATION_ORIGIN_FULL), font, f"{origin_name or 'Unknown'}"),
-        ]
-        destination_spans = [
-            Span(
-                TC(THEME_LOCATION_DESTINATION_FULL),
-                font,
-                f"{destination_name or 'Unknown'}",
-            ),
-        ]
+    origin_spans = [
+        Span(TC(THEME_LOCATION_ORIGIN_ARROW), font, ">"),
+        Span(TC(THEME_LOCATION_ORIGIN_FULL), font, f"{origin_name or 'Unknown'}"),
+    ]
+    destination_spans = [
+        Span(TC(THEME_LOCATION_DESTINATION_ARROW), font, "<"),
+        Span(
+            TC(THEME_LOCATION_DESTINATION_FULL),
+            font,
+            f"{destination_name or 'Unknown'}",
+        ),
+    ]
     return origin_spans, destination_spans
 
 
 class FullNameLabel:
-    """Bounce-scrolled origin/destination full names with an ``IATA>`` prefix.
+    """Bounce-scrolled origin/destination names with a static airport-code prefix.
 
     Owns two :class:`Scroller` instances (created on first draw, rebuilt on
     route change).  ``loop_completed`` becomes ``True`` once both scrollers
@@ -155,7 +134,7 @@ class FullNameLabel:
         icon_required: bool = False,
     ) -> None:
         cfg = Config.instance()
-        origin_spans, dest_spans = build_journey_spans(cfg, flight, icon_required)
+        origin_spans, dest_spans = build_journey_spans(cfg, flight)
 
         if self.first_draw or self._icon_required != icon_required:
             self._icon_required = icon_required
@@ -170,7 +149,6 @@ class FullNameLabel:
                 dest_spans,
                 text_x_origin,
                 available_width,
-                icon_required,
             )
             self.first_draw = False
         else:
@@ -211,39 +189,12 @@ class FullNameLabel:
         dest_spans: Spans,
         text_x_origin: int,
         available_width: int,
-        icon_required: bool = False,
     ) -> None:
         for scroller in (self.origin_scroller, self.dest_scroller):
             if scroller is not None:
                 scroller.clear()
 
-        if icon_required:
-            # The entire [code][arrow][name] scrolls as one unit from
-            # text_x_origin with the full available width.
-            self.origin_spans = origin_spans
-            self.dest_spans = dest_spans
-            self.origin_scroller = Scroller(
-                self.panel,
-                canvas,
-                text_x_origin,
-                _FULL_LINE_Y[0],
-                max(1, available_width),
-                origin_spans,
-                bounce=True,
-            )
-            self.dest_scroller = Scroller(
-                self.panel,
-                canvas,
-                text_x_origin,
-                _FULL_LINE_Y[1],
-                max(1, available_width),
-                dest_spans,
-                bounce=True,
-            )
-            return
-
-        # Static prefix: draw [code][arrow] at text_x_origin, then scroll
-        # only the name in the remaining width.
+        # Keep the airport code fixed; the arrow and description scroll after it.
         font = fonts.small_symbols
         origin = journey_display_code(flight.origin or cfg.journey_blank_filler, cfg)
         destination = journey_display_code(
@@ -258,14 +209,6 @@ class FullNameLabel:
             TC(THEME_LOCATION_ORIGIN),
             origin,
         )
-        origin_x += self.panel.draw_text(
-            canvas,
-            font,
-            origin_x,
-            _FULL_LINE_Y[0] + 1,
-            TC(THEME_LOCATION_ORIGIN_ARROW),
-            ">",
-        )
 
         dest_x = text_x_origin + self.panel.draw_text(
             canvas,
@@ -274,14 +217,6 @@ class FullNameLabel:
             _FULL_LINE_Y[1] + 1,
             TC(THEME_LOCATION_DESTINATION),
             destination,
-        )
-        dest_x += self.panel.draw_text(
-            canvas,
-            font,
-            dest_x,
-            _FULL_LINE_Y[1] + 1,
-            TC(THEME_LOCATION_DESTINATION_ARROW),
-            "<",
         )
 
         self.origin_spans = origin_spans

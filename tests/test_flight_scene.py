@@ -884,7 +884,7 @@ class TestBuildSpans:
         spans = scene.build_spans(cfg)
         texts = [s.text for s in spans if s.text]
         assert "BAW123" in texts
-        assert "787" in texts
+        assert "B788" in texts
 
     def test_mode_2_keeps_plane_static_and_scrolls_remaining_template(self):
         from scenes.flight.flight_scene import PLANE_DETAILS_Y
@@ -904,14 +904,14 @@ class TestBuildSpans:
 
         static_plane = scene.details_static_span
         assert static_plane is not None
-        assert static_plane.text == "787"
+        assert static_plane.text == "B788"
         assert scene.panel.draw_text.call_args.args == (
             scene.canvas,
             static_plane.font,
             0,
             PLANE_DETAILS_Y + 1,
             static_plane.colour,
-            "787",
+            "B788",
         )
         args = scroller_factory.call_args.args
         assert args[2] == static_plane.width + 1

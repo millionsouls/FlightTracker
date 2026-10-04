@@ -486,6 +486,83 @@ def _build_custom_spans(
     return spans, static_plane
 
 
+_PLANE_TYPE_GUESSES: tuple[tuple[str, str], ...] = (
+    # Longest / most specific model names first.
+    (r"\b(?:AIRBUS\s+)?A320\s*NEO\b", "A20N"),
+    (r"\b(?:AIRBUS\s+)?A321\s*NEO\b", "A21N"),
+    (r"\b(?:AIRBUS\s+)?A350[\s-]*1000\b", "A35K"),
+    (r"\b(?:AIRBUS\s+)?A350[\s-]*900\b", "A359"),
+    (r"\b(?:AIRBUS\s+)?A350\b", "A359"),
+    (r"\b(?:AIRBUS\s+)?A330[\s-]*900\b", "A339"),
+    (r"\b(?:AIRBUS\s+)?A330[\s-]*800\b", "A338"),
+    (r"\b(?:AIRBUS\s+)?A330[\s-]*300\b", "A333"),
+    (r"\b(?:AIRBUS\s+)?A330[\s-]*200\b", "A332"),
+    (r"\b(?:AIRBUS\s+)?A330\b", "A333"),
+    (r"\b(?:AIRBUS\s+)?A380\b", "A388"),
+    (r"\b(?:AIRBUS\s+)?A320(?:[\s-]*\d{3})?\b", "A320"),
+    (r"\b(?:AIRBUS\s+)?A321(?:[\s-]*\d{3})?\b", "A321"),
+    (r"\b(?:AIRBUS\s+)?A319(?:[\s-]*\d{3})?\b", "A319"),
+    (r"\b(?:AIRBUS\s+)?A318(?:[\s-]*\d{3})?\b", "A318"),
+    (r"\b(?:BOEING\s+)?777[\s-]*300\s*ER\b", "B77W"),
+    (r"\b(?:BOEING\s+)?777[\s-]*300\b", "B773"),
+    (r"\b(?:BOEING\s+)?777[\s-]*200\s*LR\b", "B77L"),
+    (r"\b(?:BOEING\s+)?777[\s-]*200\b", "B772"),
+    (r"\b(?:BOEING\s+)?777\b", "B772"),
+    (r"\b(?:BOEING\s+)?787[\s-]*10\b", "B78X"),
+    (r"\b(?:BOEING\s+)?787[\s-]*9\b", "B789"),
+    (r"\b(?:BOEING\s+)?787[\s-]*8\b", "B788"),
+    (r"\b(?:BOEING\s+)?787\b", "B788"),
+    (r"\b(?:BOEING\s+)?737[\s-]*MAX[\s-]*10\b", "B3XM"),
+    (r"\b(?:BOEING\s+)?737[\s-]*MAX[\s-]*9\b", "B39M"),
+    (r"\b(?:BOEING\s+)?737[\s-]*MAX[\s-]*8\b", "B38M"),
+    (r"\b(?:BOEING\s+)?737[\s-]*900\b", "B739"),
+    (r"\b(?:BOEING\s+)?737[\s-]*800\b", "B738"),
+    (r"\b(?:BOEING\s+)?737[\s-]*700\b", "B737"),
+    (r"\b(?:BOEING\s+)?737\b", "B738"),
+    (r"\b(?:BOEING\s+)?747[\s-]*8\b", "B748"),
+    (r"\b(?:BOEING\s+)?747[\s-]*400\b", "B744"),
+    (r"\b(?:BOEING\s+)?747\b", "B744"),
+    (r"\b(?:BOMBARDIER\s+)?(?:CS|C\s*SERIES)[\s-]*300\b", "BCS3"),
+    (r"\b(?:BOMBARDIER\s+)?(?:CS|C\s*SERIES)[\s-]*100\b", "BCS1"),
+    (r"\b(?:AIRBUS\s+)?A220[\s-]*300\b", "BCS3"),
+    (r"\b(?:AIRBUS\s+)?A220[\s-]*100\b", "BCS1"),
+    (r"\b(?:AIRBUS\s+)?A220\b", "BCS3"),
+    (r"\b(?:EUROCOPTER|AIRBUS\s+HELICOPTERS?)\s+EC[\s-]*145\b", "EC45"),
+    (r"\bEC[\s-]*145\b", "EC45"),
+    (r"\b(?:EUROCOPTER|AIRBUS\s+HELICOPTERS?)\s+EC[\s-]*135\b", "EC35"),
+    (r"\bEC[\s-]*135\b", "EC35"),
+    (r"\bDHC[\s-]*6\b", "DHC6"),
+    (r"\bATR[\s-]*72[\s-]*600\b", "AT76"),
+    (r"\bATR[\s-]*72[\s-]*500\b", "AT75"),
+    (r"\bATR[\s-]*72\b", "AT72"),
+    (r"\b(?:BOMBARDIER\s+)?CRJ[\s-]*900\b", "CRJ9"),
+    (r"\bCESSNA\s+172\b", "C172"),
+)
+
+
+def _icao_plane_type(value: str) -> str:
+    """Return a four-character ICAO type code from a code or model name."""
+    text = value.strip().upper()
+    if not text:
+        return ""
+
+    for pattern, code in _PLANE_TYPE_GUESSES:
+        if re.search(pattern, text):
+            return code
+
+    # Provider values often contain the type code alongside a manufacturer
+    # or variant, for example "Airbus A320" or "Boeing 737-800 (B738)".
+    for match in re.finditer(r"(?<![A-Z0-9])([A-Z0-9]{4})(?![A-Z0-9])", text):
+        code = match.group(1)
+        if any(char.isdigit() for char in code) and any(
+            char.isalpha() for char in code
+        ):
+            return code
+
+    logger.debug("Could not resolve a four-character ICAO aircraft type from %r", value)
+    return ""
+
+
 def _build_field_spans(token: FieldToken, flight: Flight, cfg: Config) -> Spans:
     """Build Span(s) for a single field token."""
     raw_value = getattr(flight, token.field, "")
@@ -496,11 +573,10 @@ def _build_field_spans(token: FieldToken, flight: Flight, cfg: Config) -> Spans:
         if not text:
             return []
         colour = _resolve_colour(token.colour, THEME_PLANE)
-        # Text fields use regular font; plane model is uppercased to match
-        # the existing model_spans() behaviour.
         if token.field == "plane":
-            text = text.split()[-1]  # Get last part
-            text = text.upper()
+            text = _icao_plane_type(text)
+            if not text:
+                return []
         return [Span(colour, fonts.regular, text)]
 
     # Telemetry fields - value + optional unit suffix.

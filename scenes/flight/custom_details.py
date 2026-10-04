@@ -483,8 +483,18 @@ def _build_field_spans(token: FieldToken, flight: Flight, cfg: Config) -> Spans:
         colour = _resolve_colour(token.colour, THEME_PLANE)
         # Text fields use regular font; plane model is uppercased to match
         # the existing model_spans() behaviour.
-        if token.field == "plane":
-            text = text.upper()
+        if token.field in TEXT_FIELDS:
+            text = str(raw_value) if raw_value else ""
+            if not text:
+                return []
+            colour = _resolve_colour(token.colour, THEME_PLANE)
+            # Text fields use regular font; plane model is uppercased to match
+            # the existing model_spans() behaviour.
+            if token.field == "plane":
+                # Skip first word if space exists (e.g., "Boeing 747" -> "747")
+                text = text.split(maxsplit=1)[1] if ' ' in text else text
+                text = text.upper()
+            return [Span(colour, fonts.regular, text)]
         return [Span(colour, fonts.regular, text)]
 
     # Telemetry fields - value + optional unit suffix.

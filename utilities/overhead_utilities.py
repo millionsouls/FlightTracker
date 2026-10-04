@@ -6,15 +6,10 @@ Consolidates:
   - Unit conversions (metres->feet, m/s->knots, m/s->fpm)
   - Geometry (in_zone, distance_from_home)
   - Field cleaning (clean_field)
-  - Airport info lookup (bundled airports.json)
+  - Airport info lookup (world-airports.csv)
 """
 
-import json
-import logging
 import math
-from pathlib import Path
-
-logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -119,44 +114,43 @@ def clean_field(value) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Airport info lookup (bundled airports.json)
+# Airport info lookup (world-airports.csv)
 # ---------------------------------------------------------------------------
 
 _airports_cache: dict[str, dict] = {}
 _airports_loaded = False
+_airports_extended = False
 
 
-def _selected_airports_filename() -> str:
-    """Pick the lookup table file from config.
+def _airport_lookup_extended() -> bool:
+    """Return whether extended CSV airport identifiers are enabled.
 
     Lazily imported: setup.configuration resolves its data paths at
     import time and this module must stay import-light.
     """
     from setup.configuration import Config
 
-    full = bool(Config.instance().airport_lookup_full)
-    return "airports-full.json" if full else "airports.json"
+    return bool(Config.instance().airport_lookup_full)
 
 
 def _load_airports():
-    global _airports_cache, _airports_loaded
-    if _airports_loaded:
+    global _airports_cache, _airports_loaded, _airports_extended
+    from utilities.lookups.providers.common.airports import airport_table
+
+    extended = _airport_lookup_extended()
+    if _airports_loaded and _airports_extended == extended:
         return
     _airports_loaded = True
-    path = Path(__file__).parent.parent / "assets" / _selected_airports_filename()
-    try:
-        with open(path, encoding="utf-8") as file:
-            _airports_cache = json.load(file)
-    except Exception as e:
-        logger.warning("Failed to load %s: %s", path, e)
-        _airports_cache = {}
+    _airports_extended = extended
+    _airports_cache = airport_table(include_extended=extended)
 
 
 def reset_airports_cache() -> None:
-    """Reset the airports.json cache (used by tests)."""
-    global _airports_cache, _airports_loaded
+    """Reset the CSV airport lookup cache (used by tests)."""
+    global _airports_cache, _airports_loaded, _airports_extended
     _airports_cache = {}
     _airports_loaded = False
+    _airports_extended = False
 
 
 def airport_info(iata: str) -> dict:

@@ -96,7 +96,7 @@ def _entry_to_route(entry: dict) -> RouteInfo | None:
     Routes the service marks "unknown" or not ``plausible`` count as
     no-data: an implausible pair would confidently draw the wrong line.
     IATA codes are preferred (the display format), with the ICAO pair
-    converted via the bundled airport table as fallback.
+    converted via world-airports.csv as fallback.
     """
     codes = (entry.get("airport_codes") or "").strip()
     if not codes or codes.lower() == "unknown":
@@ -110,11 +110,13 @@ def _entry_to_route(entry: dict) -> RouteInfo | None:
     route = RouteInfo()
     route.origin = iata_origin or icao_to_iata_code(icao_origin)
     route.destination = iata_dest or icao_to_iata_code(icao_dest)
+    route.origin_icao = icao_origin
+    route.destination_icao = icao_dest
     route.airline_icao = (entry.get("airline_code") or "").strip()
 
     if not route.origin and not route.destination:
         return None
 
-    fill_airport_details(route, "origin")
-    fill_airport_details(route, "destination")
+    fill_airport_details(route, "origin", icao_code=icao_origin)
+    fill_airport_details(route, "destination", icao_code=icao_dest)
     return route

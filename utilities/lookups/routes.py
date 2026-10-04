@@ -268,6 +268,7 @@ def _fill_cached_gaps(
         ctx, resolve_chain(load_config(), ROUTES)
     )
     result.merge_missing(pipeline_result)
+    enrich_route_names(result)
     if result.to_dict() != before:
         cache.put(callsign, _cacheable(result), kind=cache.KIND_ROUTE)
     return result
@@ -295,8 +296,10 @@ def lookup_route(
     result = RouteInfo()
     if prefill is not None:
         result.merge_missing(prefill)
+        enrich_route_names(result)
 
     if not callsign:
+        enrich_route_names(result)
         return result
 
     # 1. Persistent cache.
@@ -305,6 +308,7 @@ def lookup_route(
     if cached is not None and cached.get("miss"):
         # Whole pipeline (all providers, FR24 included) answered "unknown"
         # recently - skip everything for this poll.
+        enrich_route_names(result)
         return result
 
     if cached is None:
@@ -315,6 +319,7 @@ def lookup_route(
                 ctx, callsign, resolve_route_providers(cfg or load_config())
             )
         )
+        enrich_route_names(result)
         return result
 
     # 2b. Cached entry - seed from the cache, then fill any remaining gaps
@@ -327,6 +332,7 @@ def lookup_route(
     if not result.is_complete():
         result = _fill_cached_gaps(ctx, callsign, result)
 
+    enrich_route_names(result)
     return result
 
 

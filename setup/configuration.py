@@ -63,7 +63,7 @@ DEFAULT_SHOW_AIRLINE_ICON = (
     True  # show 16x16 airline logo (from callsign prefix) at (0,0)
 )
 DEFAULT_AIRPORT_LOOKUP_FULL = (
-    False  # airports-full.json (IATA + FAA local codes) instead of airports.json
+    False  # Include local, ICAO and GPS codes in CSV airport lookup
 )
 
 # Plane info row
@@ -990,7 +990,7 @@ class Config:
 
     @property
     def airport_lookup_full(self) -> bool:
-        """Use airports-full.json (IATA + FAA local codes) when True."""
+        """Include local, ICAO and GPS codes in CSV airport lookup."""
         return bool(
             self.data_store.get("airport_lookup_full", DEFAULT_AIRPORT_LOOKUP_FULL)
         )

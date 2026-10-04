@@ -105,15 +105,17 @@ def parse_route(data: dict) -> RouteInfo | None:
 
     if origin:
         # Prefer IATA; fall back to ICAO.
+        route.origin_icao = (origin.get("icao_code") or "").strip().upper()
         route.origin = (
             origin.get("iata_code") or origin.get("icao_code") or ""
         ).strip()
-        fill_airport_details(route, "origin")
+        fill_airport_details(route, "origin", icao_code=route.origin_icao)
     if dest:
+        route.destination_icao = (dest.get("icao_code") or "").strip().upper()
         route.destination = (
             dest.get("iata_code") or dest.get("icao_code") or ""
         ).strip()
-        fill_airport_details(route, "destination")
+        fill_airport_details(route, "destination", icao_code=route.destination_icao)
 
     # Airline ICAO from the airline block
     airline = fr.get("airline", {}) or {}

@@ -64,7 +64,9 @@ class RouteProvider:
         origin = (getattr(flight, "origin_airport_iata", "") or "").strip()
         destination = (getattr(flight, "destination_airport_iata", "") or "").strip()
 
-        origin, destination = _resolve_q_fillers(client, flight, origin, destination)
+        origin, destination, details = _resolve_q_fillers(
+            client, flight, origin, destination
+        )
 
         if not origin and not destination:
             return LookupResult.not_found("FR24 flight has no route data")
@@ -72,8 +74,10 @@ class RouteProvider:
         route = RouteInfo()
         route.origin = origin
         route.destination = destination
-        fill_airport_details(route, "origin")
-        fill_airport_details(route, "destination")
+        route.origin_icao = _details_icao(details, "origin")
+        route.destination_icao = _details_icao(details, "destination")
+        fill_airport_details(route, "origin", icao_code=route.origin_icao)
+        fill_airport_details(route, "destination", icao_code=route.destination_icao)
         route.airline_icao = (getattr(flight, "airline_icao", "") or "").strip()
 
         client.clear_feed_miss(callsign)
@@ -99,18 +103,30 @@ def _resolve_q_fillers(client, flight, origin: str, destination: str):
     FR24 stamps "QQQ" into the IATA slot for airports without an IATA
     code.  Its clickhandler details still know the airport's ICAO code,
     which converts through the bundled ICAO->IATA table when possible and
-    is otherwise used as-is when the bundled airports database can name
+    is otherwise used as-is when world-airports.csv can name
     it.  Anything unresolvable is blanked so the display falls back to
-    ``journey_blank_filler``.  Flights with no filler codes never touch
-    the details API.
+    ``journey_blank_filler``. The details response is returned too, so
+    any ICAO codes it contains remain available for CSV-based enrichment.
+    Flights with no filler codes never touch the details API.
     """
     if not (_is_q_filler(origin) or _is_q_filler(destination)):
-        return origin, destination
+        return origin, destination, None
 
     details = client.flight_details(flight)
-    return _replace_filler(details, "origin", origin), _replace_filler(
-        details, "destination", destination
+    return (
+        _replace_filler(details, "origin", origin),
+        _replace_filler(details, "destination", destination),
+        details,
     )
+
+
+def _details_icao(details, side: str) -> str:
+    if not isinstance(details, dict):
+        return ""
+    airport = details.get("airport") or {}
+    block = airport.get(side) or {}
+    code_block = block.get("code") or {}
+    return (code_block.get("icao") or "").strip().upper()
 
 
 def _replace_filler(details, side: str, code: str) -> str:
@@ -137,8 +153,7 @@ def _fallback_code(details, side: str) -> str:
     iata = icao_to_iata_code(icao)
     if iata:
         return iata
-    from utilities.overhead_utilities import airport_info
+    from utilities.lookups.providers.common.airports import airport_info_by_icao
 
-    # Keep the ICAO only when the bundled database can name it (a bare
-    # K-stripped FAA LID is NOT safe: MQJ is Moma Airport, Russia).
-    return icao if airport_info(icao) else ""
+    # Keep the ICAO only when the authoritative CSV has a matching row.
+    return icao if airport_info_by_icao(icao) else ""

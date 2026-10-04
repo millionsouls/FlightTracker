@@ -175,6 +175,8 @@ def _flight_to_route(flight: dict) -> RouteInfo | None:
     route = RouteInfo()
     route.origin = icao_to_iata_code(origin_code) or origin_code
     route.destination = icao_to_iata_code(destination_code) or destination_code
-    fill_airport_details(route, "origin")
-    fill_airport_details(route, "destination")
+    route.origin_icao = origin_code
+    route.destination_icao = destination_code
+    fill_airport_details(route, "origin", icao_code=origin_code)
+    fill_airport_details(route, "destination", icao_code=destination_code)
     return route

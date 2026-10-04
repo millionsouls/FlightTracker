@@ -36,12 +36,12 @@ class TestIcaoFormat:
 
     def test_us_local_style_code_converts(self):
         # OurAirports lists CTY (Cross City) in its IATA column, so the
-        # reverse map carries it: ICAO display shows the real KCTY.
+        # CSV reverse map carries it: ICAO display shows the real KCTY.
         assert journey_display_code("CTY", cfg("icao")) == "KCTY"
 
     def test_unknown_code_passthrough(self):
         # QQQ is FR24's no-IATA filler; KMQJ is already ICAO. Neither
-        # is in the reverse table.
+        # is in the CSV reverse map.
         for code in ("QQQ", "KMQJ", "98KY"):
             assert journey_display_code(code, cfg("icao")) == code
 
@@ -53,13 +53,13 @@ class TestIcaoFormat:
         assert journey_display_code("", cfg("icao")) == ""
 
 
-class TestRealBundledTable:
-    """Smoke tests against the shipped reverse map."""
+class TestWorldAirportsCsv:
+    """Smoke tests against the world-airports.csv source."""
 
-    def test_map_file_exists(self):
+    def test_source_file_exists(self):
         from pathlib import Path
 
-        path = Path(__file__).parent.parent / "assets" / "airports_iata_to_icao.json"
+        path = Path(__file__).parent.parent / "assets" / "world-airports.csv"
         assert path.exists()
 
     def test_regional_airports_convert(self):

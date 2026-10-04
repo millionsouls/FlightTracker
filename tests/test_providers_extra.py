@@ -239,6 +239,7 @@ class TestFr24ApiAirportIcao:
         )
 
         assert fill_airport_details(route, "origin")
+        assert route.origin == "LHR"
         assert route.origin_name == "London Heathrow Airport"
         assert route.origin_municipality == "London"
         assert route.origin_country == "United Kingdom"
@@ -247,9 +248,10 @@ class TestFr24ApiAirportIcao:
         from utilities.lookups.providers.common.airports import fill_airport_details
         from utilities.lookups.results import RouteInfo
 
-        route = RouteInfo(origin="LHR")
+        route = RouteInfo(origin="LHR", origin_name="Incorrect London Airport")
 
         assert fill_airport_details(route, "origin")
+        assert route.origin_icao == "EGLL"
         assert route.origin_name == "London Heathrow Airport"
 
 
@@ -306,6 +308,9 @@ class TestAirLabs:
         # AeroAPI answers in ICAO codes; the bundled table restores IATA.
         assert result.value.origin == "LHR"
         assert result.value.destination == "JFK"
+        assert result.value.origin_icao == "EGLL"
+        assert result.value.destination_icao == "KJFK"
+        assert result.value.origin_name == "London Heathrow Airport"
 
     def test_404_is_not_found(self):
         import utilities.lookups.providers.flightaware.routes as flightaware

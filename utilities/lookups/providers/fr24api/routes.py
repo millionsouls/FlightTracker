@@ -72,16 +72,18 @@ class RouteProvider:
         record = data[0]
         origin_icao = (record.get("orig_icao") or "").strip().upper()
         destination_icao = (record.get("dest_icao") or "").strip().upper()
-        
-        if not origin_icao and not destination_icao:
+        origin = _airport_code(record, "orig")
+        destination = _airport_code(record, "dest")
+
+        if not origin and not destination:
             return LookupResult.not_found("FR24 API flight has no route codes")
 
         route = RouteInfo()
-        route.origin = origin_icao
-        route.destination = destination_icao
+        route.origin = origin
+        route.destination = destination
         route.origin_icao = origin_icao
         route.destination_icao = destination_icao
-        
+
         fill_airport_details(route, "origin", icao_code=origin_icao)
         fill_airport_details(route, "destination", icao_code=destination_icao)
         route.airline_icao = (record.get("painted_as") or "").strip().upper()

@@ -1136,22 +1136,17 @@ def ping():
 
 
 AIRPORTS_JSON: str | None = None
+_AIRPORTS_JSON_EXTENDED: bool | None = None
 
 
 def load_airports_json() -> str:
-    global AIRPORTS_JSON
-    if AIRPORTS_JSON is None:
-        filename = (
-            "airports-full.json"
-            if Config.instance().airport_lookup_full
-            else "airports.json"
-        )
-        airports_path = Path(__file__).parent.parent / "assets" / filename
-        try:
-            with open(airports_path, encoding="utf-8") as fh:
-                AIRPORTS_JSON = fh.read()
-        except Exception:
-            AIRPORTS_JSON = "{}"
+    global AIRPORTS_JSON, _AIRPORTS_JSON_EXTENDED
+    extended = bool(Config.instance().airport_lookup_full)
+    if AIRPORTS_JSON is None or _AIRPORTS_JSON_EXTENDED != extended:
+        from utilities.lookups.providers.common.airports import airport_table
+
+        AIRPORTS_JSON = json.dumps(airport_table(include_extended=extended))
+        _AIRPORTS_JSON_EXTENDED = extended
     return AIRPORTS_JSON
 
 

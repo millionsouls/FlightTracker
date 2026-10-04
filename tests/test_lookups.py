@@ -868,7 +868,7 @@ class TestFr24RouteProvider:
         client.record_feed_miss.assert_not_called()
         client.clear_feed_miss.assert_not_called()
 
-    def test_qqq_origin_falls_back_to_icao_code(self, provider, client, monkeypatch):
+    def test_qqq_origin_falls_back_to_icao_code(self, provider, client):
         """FR24 stamps QQQ when an airport has no IATA code (N63VG case);
         the details ICAO (KMQJ) resolves in the bundled database, so the
         ICAO is kept and the airport name fills from the bundled table."""
@@ -881,24 +881,15 @@ class TestFr24RouteProvider:
                 "destination": {"code": {"iata": "CTY", "icao": "KCTY"}},
             }
         }
-        # KMQJ lives in the opt-in full airport table (no-IATA rows).
-        from utilities import overhead_utilities as oh
-
-        monkeypatch.setattr(
-            oh, "_selected_airports_filename", lambda: "airports-full.json"
-        )
-        oh.reset_airports_cache()
-        try:
-            result = provider.lookup_route(
-                LookupContext(
-                    callsign="N63VG", lat=37.0, lng=-84.7, ground_speed_mps=80
-                )
+        result = provider.lookup_route(
+            LookupContext(
+                callsign="N63VG", lat=37.0, lng=-84.7, ground_speed_mps=80
             )
-        finally:
-            oh.reset_airports_cache()
+        )
 
         assert result.is_found
         assert result.value.origin == "KMQJ"
+        assert result.value.origin_icao == "KMQJ"
         assert result.value.origin_name == "Indianapolis Regional Airport"
         assert result.value.destination == "CTY"
 
@@ -1414,6 +1405,52 @@ class TestIcaoToIata:
 
         assert icao_to_iata_code("egpf") == "GLA"
 
+    def test_keywords_are_not_mistaken_for_iata_codes(self):
+        from utilities.lookups.providers.common.airports import icao_to_iata_code
+
+        # IMZ is a keyword for OANZ in world-airports.csv, not its IATA code.
+        assert icao_to_iata_code("OANZ") == ""
+
+    def test_raw_icao_route_code_resolves_name_from_world_airports(self):
+        from utilities.lookups.providers.common.airports import fill_airport_details
+        from utilities.lookups.results import RouteInfo
+
+        route = RouteInfo(origin="EGPF")
+
+        assert fill_airport_details(route, "origin")
+        assert route.origin_name == "Glasgow Airport"
+        assert route.origin_municipality == "Glasgow"
+
+    def test_icao_name_comes_from_csv_not_stale_airport_json(self):
+        from utilities.lookups.providers.common.airports import fill_airport_details
+        from utilities.lookups.results import RouteInfo
+
+        route = RouteInfo(
+            origin="KCMA",
+            origin_icao="KCMA",
+            origin_name="Camarillo International Airport",
+        )
+
+        assert fill_airport_details(route, "origin")
+        assert route.origin == "KCMA"
+        assert route.origin_name == "Camarillo Airport"
+
+    def test_prefilled_route_name_is_reenriched_from_csv(self):
+        from utilities.lookups.results import RouteInfo
+        from utilities.lookups.routes import lookup_route
+
+        result = lookup_route(
+            LookupContext(callsign=""),
+            prefill=RouteInfo(
+                origin="KCMA",
+                origin_icao="KCMA",
+                origin_name="Camarillo International Airport",
+            ),
+        )
+
+        assert result.origin == "KCMA"
+        assert result.origin_name == "Camarillo Airport"
+
 
 class TestHexdbRouteLookup:
     """End-to-end route adapter test with a stubbed HTTP layer."""
@@ -1435,11 +1472,13 @@ class TestHexdbRouteLookup:
         result = adapter.lookup_route(LookupContext(callsign="BAW123"))
 
         assert result.is_found
-        # ICAO codes converted via the bundled table (EGPF->GLA, EGAA->BFS)
+        # ICAO codes converted via world-airports.csv (EGPF->GLA, EGAA->BFS)
         assert result.value.origin == "GLA"
         assert result.value.destination == "BFS"
+        assert result.value.origin_icao == "EGPF"
+        assert result.value.destination_icao == "EGAA"
         # Airport names enriched from world-airports.csv by ICAO.
-        assert result.value.origin_name != ""
+        assert result.value.origin_name == "Glasgow Airport"
         assert result.value.destination_name != ""
 
     def test_404_is_not_found(self, adapter, monkeypatch):

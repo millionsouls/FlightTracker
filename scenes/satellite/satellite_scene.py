@@ -48,10 +48,10 @@ PRIORITY = 2
 # =========================================================================
 
 GLOW_ANIMATION_ENABLED = True       # Use pulsing glow instead of blinking
-MOTION_VECTORS_ENABLED = True       # Show direction of travel arrows
+MOTION_VECTORS_ENABLED = False       # Show direction of travel arrows
 GRID_LINES_ENABLED = True           # Show elevation reference circles (30°, 60°)
-CARDINAL_LABELS_ENABLED = True      # Show N/S/E/W direction labels
-INFO_DISPLAY_ENABLED = True         # Show satellite name + Az/El info
+CARDINAL_LABELS_ENABLED = False     # Show N/S/E/W direction labels
+INFO_DISPLAY_ENABLED = False        # Show satellite name + Az/El info
 BACKGROUND_ENABLED = True           # Draw dark background for contrast
 
 # How long (in seconds) to display each satellite's telemetry before cycling
@@ -363,7 +363,7 @@ class SatelliteScene:
             Line 1: "ISS (ZARYA)"         (yellow name)
             Line 2: (blank)
             Line 3: "Speed"               (peach label)
-            Line 4: "27420 km/h"          (white value + pink unit)
+            Line 4: "7.6 km/s"            (white value + pink unit)
             Line 5: "Altitude"            (peach label)
             Line 6: "408 km"              (white value + pink unit)
 
@@ -399,25 +399,12 @@ class SatelliteScene:
             
             if telemetry is not None:
                 speed_kmh, alt_km = telemetry
+
+                speed_val = f"{speed_kmh / 3600:.1f}"
+                speed_unit = "km/s"
                 
-                # Convert speed to configured unit
-                if cfg.speed_unit == "mph":
-                    speed_val = f"{int(speed_kmh * 0.621371)}"
-                    speed_unit = "mph"
-                elif cfg.speed_unit == "kts":
-                    speed_val = f"{int(speed_kmh * 0.539957)}"
-                    speed_unit = "kts"
-                else:
-                    speed_val = f"{int(speed_kmh)}"
-                    speed_unit = "km/h"
-                
-                # Convert altitude to configured unit
-                if cfg.height_unit == "ft":
-                    alt_val = f"{int(alt_km * 3280.84)}"
-                    alt_unit = "ft"
-                else:
-                    alt_val = f"{int(alt_km * 1000)}"
-                    alt_unit = "m"
+                alt_val = f"{int(alt_km * 1000)}"
+                alt_unit = "m"
             else:
                 speed_val, speed_unit = "--", ""
                 alt_val, alt_unit = "--", ""

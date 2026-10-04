@@ -192,6 +192,67 @@ def _context(callsign="BAW123", lat=55.5, lng=-4.0):
     return LookupContext(callsign=callsign, lat=lat, lng=lng)
 
 
+class TestFr24ApiAirportIcao:
+    def test_icao_overrides_conflicting_iata_for_code_and_name(self, monkeypatch):
+        import utilities.lookups.providers.fr24api.routes as fr24api
+        from utilities.overhead_utilities import airport_info
+
+        monkeypatch.setattr(
+            fr24api,
+            "callsign_position",
+            lambda *args: _response(
+                {
+                    "data": [
+                        {
+                            "orig_iata": "GLA",
+                            "orig_icao": "EGLL",
+                            "dest_iata": "JFK",
+                            "painted_as": "BAW",
+                        }
+                    ]
+                }
+            ),
+        )
+
+        result = fr24api.RouteProvider({"api_key": "token"}).lookup_route(
+            _context()
+        )
+
+        assert result.is_found
+        assert result.value.origin == "LHR"
+        assert result.value.origin_name == airport_info("LHR")["name"]
+
+        from utilities.flight import Flight
+
+        flight = Flight.from_route(result.value)
+        assert flight.origin == "LHR"
+        assert flight.origin_name == "London Heathrow Airport"
+
+    def test_world_airports_icao_overrides_stale_description(self):
+        from utilities.lookups.providers.common.airports import fill_airport_details
+        from utilities.lookups.results import RouteInfo
+
+        route = RouteInfo(
+            origin="GLA",
+            origin_icao="EGLL",
+            origin_name="Incorrect Glasgow Airport",
+        )
+
+        assert fill_airport_details(route, "origin")
+        assert route.origin_name == "London Heathrow Airport"
+        assert route.origin_municipality == "London"
+        assert route.origin_country == "United Kingdom"
+
+    def test_iata_fallback_is_converted_to_icao_for_csv_lookup(self):
+        from utilities.lookups.providers.common.airports import fill_airport_details
+        from utilities.lookups.results import RouteInfo
+
+        route = RouteInfo(origin="LHR")
+
+        assert fill_airport_details(route, "origin")
+        assert route.origin_name == "London Heathrow Airport"
+
+
 # ---------------------------------------------------------------------------
 # AirLabs + FlightAware (keyed route providers)
 # ---------------------------------------------------------------------------

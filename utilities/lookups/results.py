@@ -188,6 +188,8 @@ class RouteInfo:
     destination_municipality: str = ""
     origin_country: str = ""
     destination_country: str = ""
+    origin_icao: str = ""
+    destination_icao: str = ""
 
     def is_complete(self) -> bool:
         """True when the flight-level route data is fully known.
@@ -198,8 +200,8 @@ class RouteInfo:
         ``registration``) is deliberately excluded - it belongs to the
         mode-s aircraft pipeline, which caches it per airframe, so route
         providers are never re-queried just to fill airframe fields.
-        Airport names/municipalities/countries come from the bundled
-        airports.json rather than by providers, so only the codes and
+        Airport names/municipalities/countries are enriched from
+        world-airports.csv using ICAO codes, so only route codes and
         identity fields count as "enrichable pipeline fields".
         """
         return bool(self.origin and self.destination and self.airline_icao)

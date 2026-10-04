@@ -70,16 +70,20 @@ class RouteProvider:
             return LookupResult.not_found("no FR24 API flight for this callsign")
 
         record = data[0]
-        origin = _airport_code(record, "orig")
-        destination = _airport_code(record, "dest")
-        if not origin and not destination:
+        origin_icao = (record.get("orig_icao") or "").strip().upper()
+        destination_icao = (record.get("dest_icao") or "").strip().upper()
+        
+        if not origin_icao and not destination_icao:
             return LookupResult.not_found("FR24 API flight has no route codes")
 
         route = RouteInfo()
-        route.origin = origin
-        route.destination = destination
-        fill_airport_details(route, "origin")
-        fill_airport_details(route, "destination")
+        route.origin = origin_icao
+        route.destination = destination_icao
+        route.origin_icao = origin_icao
+        route.destination_icao = destination_icao
+        
+        fill_airport_details(route, "origin", icao_code=origin_icao)
+        fill_airport_details(route, "destination", icao_code=destination_icao)
         route.airline_icao = (record.get("painted_as") or "").strip().upper()
 
         logger.debug(
@@ -89,9 +93,9 @@ class RouteProvider:
 
 
 def _airport_code(record: dict, side: str) -> str:
-    """The IATA code for one side of the journey, ICAO-converted if needed."""
+    """Return the IATA equivalent of ICAO when available, otherwise the feed code."""
     code = (record.get(f"{side}_iata") or "").strip().upper()
-    if code:
-        return code
     icao = (record.get(f"{side}_icao") or "").strip().upper()
-    return icao_to_iata_code(icao) if icao else ""
+    if icao:
+        return icao_to_iata_code(icao) or code or icao  # ← Converting to IATA!
+    return code

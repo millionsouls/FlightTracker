@@ -178,14 +178,15 @@ def run_route_pipeline(
 
 
 def enrich_route_names(route: RouteInfo) -> bool:
-    """Fill blank name/municipality/country fields from the bundled airports.json.
+    """Resolve airport descriptions from world-airports.csv.
 
-    Modifies *route* in-place; returns True when anything changed (callers
-    use that to decide whether to re-write the cache).
+    Modifies *route* in-place; returns True when any description changed.
     """
     changed = False
     for side in ("origin", "destination"):
-        if fill_airport_details(route, side):
+        if fill_airport_details(
+            route, side, icao_code=getattr(route, f"{side}_icao", "")
+        ):
             changed = True
     return changed
 

@@ -86,6 +86,11 @@ class Flight:
         ``plane`` from a local tar1090 database takes priority over the
         hexdb lookup result).
         """
-        route_fields = {f.name: getattr(route, f.name) for f in fields(route)}
+        flight_fields = {field.name for field in fields(cls)}
+        route_fields = {
+            field.name: getattr(route, field.name)
+            for field in fields(route)
+            if field.name in flight_fields
+        }
         route_fields.update(telemetry)
         return cls(**route_fields)

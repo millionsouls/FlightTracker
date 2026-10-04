@@ -1438,7 +1438,7 @@ class TestHexdbRouteLookup:
         # ICAO codes converted via the bundled table (EGPF->GLA, EGAA->BFS)
         assert result.value.origin == "GLA"
         assert result.value.destination == "BFS"
-        # Airport names enriched from the bundled airports.json
+        # Airport names enriched from world-airports.csv by ICAO.
         assert result.value.origin_name != ""
         assert result.value.destination_name != ""
 

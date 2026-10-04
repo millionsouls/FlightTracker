@@ -9,7 +9,10 @@ from __future__ import annotations
 
 import logging
 import types
+from unittest.mock import MagicMock, patch
 
+from display.rgbpanel import Colour
+from scenes.satellite import azel_plot
 import scenes.satellite.satellite_scene as satellite_scene
 from scenes.satellite.satellite_scene import SatelliteScene
 
@@ -130,3 +133,58 @@ class TestHealthyPathCooldown:
 
         scene.poll()  # next tick: gated, try_get not called again
         assert manager.try_get_calls == 1
+
+
+class TestAzElPlotRendering:
+    def test_scene_plot_helpers_exist_and_draw(self, monkeypatch):
+        monkeypatch.setattr(azel_plot, "fonts", types.SimpleNamespace(extrasmall=object()))
+        panel = MagicMock()
+        canvas = object()
+
+        azel_plot.draw_background(panel, canvas)
+        azel_plot.draw_elevation_grid(panel, canvas)
+        azel_plot.draw_horizon_ring(panel, canvas)
+        azel_plot.draw_cardinal_labels(panel, canvas)
+        azel_plot.draw_position_with_glow(panel, canvas, 45, 30, 0, 1)
+        azel_plot.draw_motion_vector(panel, canvas, (45, 30), (40, 20), 0)
+        azel_plot.draw_satellite_info(panel, canvas, "ISS", 45, 30, 0)
+
+        assert panel.set_pixel.called
+        assert panel.draw_circle.call_count == 3
+        assert panel.draw_line.called
+        assert panel.draw_text.call_count == 6
+
+
+class TestSatelliteSpeedDisplay:
+    def test_speed_is_always_displayed_in_kilometres_per_second(self):
+        class TestFont:
+            def CharacterWidth(self, codepoint):
+                return 4
+
+        scene = SatelliteScene(
+            canvas=object(), panel=MagicMock(), tle_manager=_FakeTLEManager(None)
+        )
+        window = types.SimpleNamespace(name="ISS", tle_index=0)
+        cfg = types.SimpleNamespace(height_unit="m")
+
+        with patch.object(satellite_scene.Config, "instance", return_value=cfg):
+            with patch.object(
+                satellite_scene.passes_mod,
+                "current_position",
+                return_value=(45.0, 30.0),
+            ):
+                with patch.object(
+                    satellite_scene,
+                    "compute_telemetry",
+                    return_value=(27600.0, 408.0),
+                ):
+                    with patch.object(
+                        satellite_scene.fonts,
+                        "extrasmall",
+                        TestFont(),
+                    ):
+                        for speed_unit in ("kmh", "mph", "kts"):
+                            cfg.speed_unit = speed_unit
+                            scene.update_text_panel([window])
+                            assert scene.last_text["spd_value"].span.text == "7.7"
+                            assert scene.last_text["spd_unit"].span.text == "km/s"

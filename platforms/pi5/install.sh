@@ -7,8 +7,8 @@
 # which drives the RGB panel via the Pi 5's PIO subsystem - no C++ compilation
 # needed, unlike the Pi 3/4 installer which builds hzeller's rpi-rgb-led-matrix.
 #
-# Usage:
-#   curl -sSL https://raw.githubusercontent.com/ColinWaddell/FlightTracker/main/platforms/pi5/install.sh | bash
+# Usage (from the root of a local FlightTracker checkout):
+#   bash platforms/pi5/install.sh
 #
 
 set -e
@@ -25,9 +25,6 @@ fi
 # ============================================================================
 # CONFIGURATION
 # ============================================================================
-
-# Git branch to clone
-BRANCH="main"
 
 # ============================================================================
 # HELPERS
@@ -186,13 +183,6 @@ else
     NEEDS_RELOGIN=0
 fi
 
-# Check internet connectivity
-if ! ping -c 1 -W 5 github.com >/dev/null 2>&1; then
-    error "Cannot reach github.com. Check your internet connection."
-    exit 1
-fi
-info "Internet connectivity: OK"
-
 # Check sudo access
 if ! sudo -n true 2>/dev/null; then
     if ! sudo true 2>/dev/null; then
@@ -204,12 +194,26 @@ info "Sudo access: OK"
 
 # Paths
 INSTALL_DIR="${CURRENT_HOME}/FlightTracker"
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+SOURCE_DIR="$(cd -- "${SCRIPT_DIR}/../.." && pwd)"
+
+# When this script is run from stdin, it is first saved to /tmp so prompts can
+# use the terminal. In that case, use the current directory if it is a checkout.
+if [ ! -f "${SOURCE_DIR}/platforms/pi5/requirements.txt" ]; then
+    SOURCE_DIR="$(pwd)"
+fi
+if [ ! -f "${SOURCE_DIR}/platforms/pi5/requirements.txt" ] ||
+    [ ! -f "${SOURCE_DIR}/flight-tracker.py" ]; then
+    error "Could not find the local FlightTracker repository."
+    error "Run this script from a local checkout: bash platforms/pi5/install.sh"
+    exit 1
+fi
 
 # ============================================================================
 # EXISTING INSTALLATION CHECK
 # ============================================================================
 
-if [ -d "$INSTALL_DIR" ]; then
+if [ -d "$INSTALL_DIR" ] && [ ! "$SOURCE_DIR" -ef "$INSTALL_DIR" ]; then
     echo ""
     warn "An existing FlightTracker installation was detected at ${INSTALL_DIR}"
     echo ""
@@ -319,20 +323,19 @@ fi
 success "System update complete."
 
 # ============================================================================
-# STEP 2: Clone FlightTracker Repo
+# STEP 2: Prepare FlightTracker Source
 # ============================================================================
 
 echo ""
-echo -e "${BOLD}--- Step 2: Clone FlightTracker ---${NC}"
+echo -e "${BOLD}--- Step 2: Prepare FlightTracker ---${NC}"
 echo ""
 
-run_quiet "Cloning FlightTracker (branch: ${BRANCH})" git clone --depth 1 --branch "${BRANCH}" https://github.com/ColinWaddell/FlightTracker || exit 1
-
-if [ ! -d "$INSTALL_DIR" ]; then
-    error "Failed to clone FlightTracker repository."
-    exit 1
+if [ "$SOURCE_DIR" -ef "$INSTALL_DIR" ]; then
+    info "Using local checkout at ${SOURCE_DIR} as the installation directory."
+else
+    run_quiet "Copying local FlightTracker checkout" cp -a "$SOURCE_DIR" "$INSTALL_DIR" || exit 1
 fi
-success "FlightTracker cloned to ${INSTALL_DIR}"
+success "FlightTracker source is ready at ${INSTALL_DIR}"
 
 # ============================================================================
 # STEP 3: Create Virtual Environment & Install Python Dependencies

@@ -14,7 +14,8 @@ from unittest.mock import MagicMock, patch
 from display.rgbpanel import Colour
 from scenes.satellite import azel_plot
 import scenes.satellite.satellite_scene as satellite_scene
-from scenes.satellite.satellite_scene import SatelliteScene
+from scenes.satellite.passes import fake_pass_window
+from scenes.satellite.satellite_scene import SatelliteScene, compute_telemetry
 
 _LOGGER = "scenes.satellite.satellite_scene"
 
@@ -156,6 +157,12 @@ class TestAzElPlotRendering:
 
 
 class TestSatelliteSpeedDisplay:
+    def test_debug_fake_pass_provides_telemetry(self):
+        window = fake_pass_window()
+
+        assert len(window.trajectory) > 1
+        assert compute_telemetry(window) is not None
+
     def test_speed_is_always_displayed_in_kilometres_per_second(self):
         class TestFont:
             def CharacterWidth(self, codepoint):

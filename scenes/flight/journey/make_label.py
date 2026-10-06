@@ -10,8 +10,9 @@ from setup.configuration import Config
 def make_label(cfg: Config, panel):
     """Return the journey label for the configured airport display style.
 
-    Style 0 -> :class:`ShortCodeLabel`; styles 1-4 -> :class:`FullNameLabel`.
+    Style 0 with ICAO codes -> :class:`ShortCodeLabel`; all other settings
+    use :class:`FullNameLabel` with stacked airport codes and names.
     """
-    if cfg.airport_display_style == 0:
+    if cfg.airport_display_style == 0 and cfg.airport_code_format == "icao":
         return ShortCodeLabel(panel)
     return FullNameLabel(panel)

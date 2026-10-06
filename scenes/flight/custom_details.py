@@ -50,7 +50,7 @@ NOT_DEFINED_TEXT = "<custom scroller not defined>"
 # Field metadata
 # ---------------------------------------------------------------------------
 
-# Text fields - rendered with fonts.regular, colour THEME_PLANE.
+# Text fields - rendered with fonts.tiny, colour THEME_PLANE.
 TEXT_FIELDS: frozenset[str] = frozenset(
     {
         "callsign",
@@ -71,7 +71,7 @@ TEXT_FIELDS: frozenset[str] = frozenset(
     }
 )
 
-# Telemetry fields - rendered with fonts.small_symbols, colour THEME_PLANE_TLM.
+# Telemetry fields - rendered with fonts.tiny, colour THEME_PLANE_TLM.
 # Each maps to a set of valid unit strings and a conversion function.
 # Conversion functions take (raw_value, unit) and return (value_str, unit_str).
 
@@ -441,7 +441,7 @@ def _build_custom_spans(
     separate_plane: bool,
 ) -> tuple[Spans, Span | None]:
     if not template or not template.strip():
-        return [Span(TC(THEME_PLANE), fonts.regular, NOT_DEFINED_TEXT)], None
+        return [Span(TC(THEME_PLANE), fonts.tiny, NOT_DEFINED_TEXT)], None
 
     tokens = parse_template(template)
     spans: Spans = []
@@ -450,7 +450,7 @@ def _build_custom_spans(
     for token in tokens:
         if isinstance(token, LiteralToken):
             if token.text:
-                spans.append(Span(TC(THEME_PLANE), fonts.regular, token.text))
+                spans.append(Span(TC(THEME_PLANE), fonts.tiny, token.text))
 
         elif isinstance(token, FieldToken):
             field_spans = _build_field_spans(token, flight, cfg)
@@ -473,7 +473,7 @@ def _build_custom_spans(
                 index = int(math.floor(heading / 45.0 + 0.5)) % 8
                 text = HEADING_ARROW_DIRECTIONS[index]
                 colour = _resolve_colour(token.colour, THEME_PLANE)
-                spans.append(Span(colour, fonts.regular, text))
+                spans.append(Span(colour, fonts.tiny, text))
             else:
                 glyph = SYMBOL_MAP.get(token.name, "")
                 if glyph:
@@ -481,7 +481,7 @@ def _build_custom_spans(
                     spans.append(Span(colour, fonts.small_symbols, glyph))
 
     if (not spans or all(span.text == "" for span in spans)) and static_plane is None:
-        spans = [Span(TC(THEME_PLANE), fonts.regular, NOT_DEFINED_TEXT)]
+        spans = [Span(TC(THEME_PLANE), fonts.tiny, NOT_DEFINED_TEXT)]
 
     return spans, static_plane
 
@@ -577,7 +577,7 @@ def _build_field_spans(token: FieldToken, flight: Flight, cfg: Config) -> Spans:
             text = _icao_plane_type(text)
             if not text:
                 return []
-        return [Span(colour, fonts.regular, text)]
+        return [Span(colour, fonts.tiny, text)]
 
     # Telemetry fields - value + optional unit suffix.
     if token.field in TELEMETRY_FIELDS:
@@ -589,11 +589,11 @@ def _build_field_spans(token: FieldToken, flight: Flight, cfg: Config) -> Spans:
         value_str = format_number(int(value_str), cfg.number_separator)
 
         colour = _resolve_colour(token.colour, THEME_PLANE_TLM)
-        result: Spans = [Span(colour, fonts.small_symbols, value_str)]
+        result: Spans = [Span(colour, fonts.tiny, value_str)]
 
         if unit_str:
             unit_colour = _resolve_colour(token.colour, THEME_PLANE_TLM_UNITS)
-            result.append(Span(unit_colour, fonts.small_symbols, unit_str))
+            result.append(Span(unit_colour, fonts.tiny, unit_str))
 
         return result
 

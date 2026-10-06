@@ -209,6 +209,9 @@ class TestBuildCustomSpans:
         spans = build_custom_spans("{plane}", flight, cfg)
         assert len(spans) == 1
         assert spans[0].text == "B789"
+        from setup import fonts
+
+        assert spans[0].font is fonts.tiny
 
     def test_plane_field_uses_icao_type_code(self):
         cfg = make_cfg()

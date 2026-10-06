@@ -446,9 +446,18 @@ class TestNullWidget:
 
 
 class TestMakeLabel:
-    def test_style_0_returns_short_code_label(self, monkeypatch):
+    def test_style_0_iata_returns_stacked_journey_label(self):
         cfg = MagicMock()
         cfg.airport_display_style = 0
+        cfg.airport_code_format = "iata"
+        panel, _ = _make_panel_and_canvas()
+        label = make_label(cfg, panel)
+        assert isinstance(label, FullNameLabel)
+
+    def test_style_0_icao_returns_short_code_label(self):
+        cfg = MagicMock()
+        cfg.airport_display_style = 0
+        cfg.airport_code_format = "icao"
         panel, _ = _make_panel_and_canvas()
         label = make_label(cfg, panel)
         assert isinstance(label, ShortCodeLabel)
@@ -729,9 +738,9 @@ class TestCallsignBar:
         from setup import fonts
 
         text_call = panel.draw_text.call_args
-        assert text_call.args[1] is fonts.tiny
-        assert text_call.args[3] == 25
-        assert all(call.args[2] == 18 for call in panel.draw_square.call_args_list)
+        assert text_call.args[1] is fonts.thum
+        assert text_call.args[3] == 26
+        assert all(call.args[2] == 22 for call in panel.draw_square.call_args_list)
 
     def test_cached_redraw_skips(self):
         panel, canvas = _make_panel_and_canvas()
@@ -776,7 +785,7 @@ class TestAirlineNameBar:
         assert bar.scroller is not None
         assert panel.draw_square.called  # background blank
         assert any(
-            call.args[2] == 18 for call in panel.draw_square.call_args_list
+            call.args[2] == 22 for call in panel.draw_square.call_args_list
         )
 
     def test_rebuilds_scroller_on_flight_change(self):
@@ -1074,13 +1083,12 @@ class TestJourneyCodeDisplay:
             destination_name="Heathrow Airport",
         )
         origin_spans, dest_spans = build_journey_spans(cfg, flight)
-        assert [span.text for span in origin_spans] == [">", "Glasgow Airport"]
-        assert [span.text for span in dest_spans] == ["<", "Heathrow Airport"]
+        assert [span.text for span in origin_spans] == ["Glasgow Airport"]
+        assert [span.text for span in dest_spans] == ["Heathrow Airport"]
         from setup import fonts
 
-        assert origin_spans[0].font is fonts.small_symbols
-        assert origin_spans[1].font is fonts.thum
-        assert dest_spans[1].font is fonts.thum
+        assert origin_spans[0].font is fonts.thum
+        assert dest_spans[0].font is fonts.thum
 
     def test_full_label_spans_iata_unchanged(self):
         from scenes.flight.journey.full_label import build_journey_spans
@@ -1088,11 +1096,12 @@ class TestJourneyCodeDisplay:
         cfg = self._cfg()
         flight = Flight(origin="GLA", destination="LHR")
         origin_spans, dest_spans = build_journey_spans(cfg, flight)
-        assert [span.text for span in origin_spans] == [">", "Unknown"]
-        assert [span.text for span in dest_spans] == ["<", "Unknown"]
+        assert [span.text for span in origin_spans] == ["Unknown"]
+        assert [span.text for span in dest_spans] == ["Unknown"]
 
     def test_full_label_keeps_icao_codes_static_with_airline_icon(self):
         from scenes.flight.journey.full_label import FullNameLabel
+        from setup import fonts
         from setup.configuration import Config
 
         cfg = self._cfg(airport_display_style=1, airport_code_format="icao")
@@ -1118,14 +1127,22 @@ class TestJourneyCodeDisplay:
         drawn_text = [call.args[-1] for call in panel.draw_text.call_args_list]
         assert "EGPF" in drawn_text
         assert "EGLL" in drawn_text
+        assert panel.draw_square.call_args.args[4] == 20
+        code_calls = [
+            call
+            for call in panel.draw_text.call_args_list
+            if call.args[-1] in ("EGPF", "EGLL")
+        ]
+        assert [call.args[3] for call in code_calls] == [5, 16]
+        assert all(call.args[1] is fonts.thum for call in code_calls)
         origin_scroll = scroller_factory.call_args_list[0].args
         destination_scroll = scroller_factory.call_args_list[1].args
-        assert origin_scroll[2] == 39
-        assert destination_scroll[2] == 39
-        assert [span.text for span in origin_scroll[5]] == [">", "Glasgow Airport"]
-        assert [span.text for span in destination_scroll[5]] == ["<", "Heathrow Airport"]
-        assert ">" not in drawn_text
-        assert "<" not in drawn_text
+        assert origin_scroll[2] == 19
+        assert destination_scroll[2] == 19
+        assert origin_scroll[3] == 5
+        assert destination_scroll[3] == 16
+        assert [span.text for span in origin_scroll[5]] == ["Glasgow Airport"]
+        assert [span.text for span in destination_scroll[5]] == ["Heathrow Airport"]
 
     # -- scene redraw key: flipping the format must reset the label --
 

@@ -20,7 +20,8 @@ from setup.themes import (
 from utilities.flight import Flight
 
 # Baselines for the two scrolled lines (origin on top, destination below).
-_FULL_LINE_Y = (6, 14)
+_CODE_BASELINES = (5, 15)
+_NAME_LINE_Y = (9, 19)
 
 ABBREVIATIONS = {
     "International": "Int",
@@ -79,18 +80,14 @@ def build_journey_spans(
         style,
     )
 
-    font = fonts.thum
+    font = fonts.tiny
     origin_spans = [
         # Span(TC(THEME_LOCATION_ORIGIN_ARROW), fonts.small_symbols, ">"),
-        Span(TC(THEME_LOCATION_ORIGIN_FULL), font, f"{origin_name or 'Unknown'}"),
+        Span(TC(THEME_LOCATION_ORIGIN_FULL), font, f"{origin_name.upper() or 'Unknown'}"),
     ]
     destination_spans = [
         # Span(TC(THEME_LOCATION_DESTINATION_ARROW), fonts.small_symbols, "<"),
-        Span(
-            TC(THEME_LOCATION_DESTINATION_FULL),
-            font,
-            f"{destination_name or 'Unknown'}",
-        ),
+        Span(TC(THEME_LOCATION_DESTINATION_FULL), font, f"{destination_name.upper() or 'Unknown'}"),
     ]
     return origin_spans, destination_spans
 
@@ -139,7 +136,7 @@ class FullNameLabel:
         if self.first_draw or self._icon_required != icon_required:
             self._icon_required = icon_required
             self.panel.draw_square(
-                canvas, text_x_origin, 0, screen.WIDTH - 1, 16, TC(THEME_BG)
+                canvas, text_x_origin, 0, screen.WIDTH - 1, 20, TC(THEME_BG)
             )
             self._setup(
                 canvas,
@@ -194,27 +191,27 @@ class FullNameLabel:
             if scroller is not None:
                 scroller.clear()
 
-        # Keep the airport code fixed; the arrow and description scroll after it.
-        font = fonts.thum
+        # Keep the airport code fixed above its independently scrolling name.
+        font = fonts.tinyd
         origin = journey_display_code(flight.origin or cfg.journey_blank_filler, cfg)
         destination = journey_display_code(
             flight.destination or cfg.journey_blank_filler, cfg
         )
 
-        origin_x = text_x_origin + self.panel.draw_text(
+        self.panel.draw_text(
             canvas,
             font,
             text_x_origin,
-            _FULL_LINE_Y[0] + 1,
+            _CODE_BASELINES[0],
             TC(THEME_LOCATION_ORIGIN),
             origin,
         )
 
-        dest_x = text_x_origin + self.panel.draw_text(
+        self.panel.draw_text(
             canvas,
             font,
             text_x_origin,
-            _FULL_LINE_Y[1] + 1,
+            _CODE_BASELINES[1],
             TC(THEME_LOCATION_DESTINATION),
             destination,
         )
@@ -224,18 +221,18 @@ class FullNameLabel:
         self.origin_scroller = Scroller(
             self.panel,
             canvas,
-            origin_x,
-            _FULL_LINE_Y[0],
-            max(1, text_x_origin + available_width - origin_x),
+            text_x_origin,
+            _NAME_LINE_Y[0],
+            available_width,
             origin_spans,
             bounce=True,
         )
         self.dest_scroller = Scroller(
             self.panel,
             canvas,
-            dest_x,
-            _FULL_LINE_Y[1],
-            max(1, text_x_origin + available_width - dest_x),
+            text_x_origin,
+            _NAME_LINE_Y[1],
+            available_width,
             dest_spans,
             bounce=True,
         )

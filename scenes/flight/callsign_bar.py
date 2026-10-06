@@ -34,12 +34,12 @@ from setup.themes import (
 from utilities.flight import Flight
 
 # Shared layout constants (same as the original draw_callsign).
-BAR_STARTING_POSITION = (0, 22)
+BAR_STARTING_POSITION = (0, 23)
 BAR_PADDING = 1
-FLIGHT_NO_POSITION = (0, 25)
+FLIGHT_NO_POSITION = (0, 26)
 FLIGHT_NO_TEXT_HEIGHT = 8
 FLIGHT_NO_FONT = fonts.thum
-DATA_INDEX_POSITION = (52, 25)
+DATA_INDEX_POSITION = (52, 26)
 DATA_INDEX_FONT = fonts.thum
 BAR_CLEAR_TOP = AIRLINE_ICON_SIZE + 1
 

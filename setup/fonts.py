@@ -17,8 +17,8 @@ def _load_fonts():
 
     _loaded_fonts["xtiny"] = panel.load_font(f"{DIR_PATH}/../fonts/3x4.bdf")
     _loaded_fonts["tiny"] = panel.load_font(f"{DIR_PATH}/../fonts/Tiny5.bdf")
-    _loaded_fonts["tinym"] = panel.load_font(f"{DIR_PATH}/../fonts/Tiny5Duo.bdf")
-    _loaded_fonts["tinyd"] = panel.load_font(f"{DIR_PATH}/../fonts/Tiny5Mono.bdf")
+    _loaded_fonts["tinyd"] = panel.load_font(f"{DIR_PATH}/../fonts/Tiny5Duo.bdf")
+    _loaded_fonts["tinym"] = panel.load_font(f"{DIR_PATH}/../fonts/Tiny5Mono.bdf")
     _loaded_fonts["thum"] = panel.load_font(f"{DIR_PATH}/../fonts/tom-thumb.bdf")
 
     _loaded_fonts["extrasmall"] = panel.load_font(f"{DIR_PATH}/../fonts/4x6.bdf")

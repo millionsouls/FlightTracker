@@ -85,7 +85,7 @@ def telemetry_changed(old: list, new: list) -> bool:
 # Plane details (scrolling bar)
 # ---------------------------------------------------------------------------
 
-PLANE_DETAILS_Y = 30
+PLANE_DETAILS_Y = 31
 PLANE_DETAILS_HEIGHT = 8
 
 # ---------------------------------------------------------------------------

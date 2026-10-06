@@ -418,10 +418,10 @@ class SatelliteScene:
         f = fonts.extrasmall
         new_texts: dict[str, PlacedSpan] = {
             "name": PlacedSpan(Span(YELLOW, f, window.name), TEXT_COL_X, NAME_Y),
-            "spd_label": PlacedSpan(Span(PEACH, f, "Speed"), TEXT_COL_X, LINE1_Y),
+            "spd_label": PlacedSpan(Span(PEACH, f, "SPD"), TEXT_COL_X, LINE1_Y),
             "spd_value": PlacedSpan(Span(WHITE, f, speed_val), TEXT_COL_X, LINE2_Y),
             "spd_unit": PlacedSpan(Span(PINK, f, speed_unit), 0, LINE2_Y),
-            "alt_label": PlacedSpan(Span(PEACH, f, "Altitude"), TEXT_COL_X, LINE3_Y),
+            "alt_label": PlacedSpan(Span(PEACH, f, "ALT"), TEXT_COL_X, LINE3_Y),
             "alt_value": PlacedSpan(Span(WHITE, f, alt_val), TEXT_COL_X, LINE4_Y),
             "alt_unit": PlacedSpan(Span(PINK, f, alt_unit), 0, LINE4_Y),
         }

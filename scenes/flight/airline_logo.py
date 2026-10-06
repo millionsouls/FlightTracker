@@ -1,4 +1,4 @@
-"""Airline logo widget - draws a 16x16 airline icon at (0, 0).
+"""Airline logo widget - draws an 18x18 airline icon at (0, 0).
 
 The icon is sourced from the operating carrier's ICAO code, resolved by
 :func:`airline_icao_from_flight` from three sources in descending order of
@@ -43,7 +43,7 @@ logger = logging.getLogger(__name__)
 # Dimensions / position
 # -----------------------------------------------------------------------
 
-AIRLINE_ICON_SIZE = 16  # square: 16x16
+AIRLINE_ICON_SIZE = 20  # square: 18x18
 AIRLINE_ICON_X = 0
 AIRLINE_ICON_Y = 0
 
@@ -300,6 +300,9 @@ class AirlineLogoWidget:
         )
         icon = _load_airline_icon(prefix)
         if icon is not None:
+            icon = icon.resize(
+                (AIRLINE_ICON_SIZE, AIRLINE_ICON_SIZE), Image.Resampling.NEAREST
+            )
             self.panel.draw_image(canvas, AIRLINE_ICON_X, AIRLINE_ICON_Y, icon)
             self._icon_drawn = True
         else:

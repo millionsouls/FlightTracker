@@ -23,10 +23,10 @@ from utilities.flight import Flight
 _FULL_LINE_Y = (6, 14)
 
 ABBREVIATIONS = {
-    "International": "Intl",
-    "international": "Intl",
-    "Airport": "",
-    "airport": "",
+    "International": "Int",
+    "international": "Int",
+    "Airport": "Apt",
+    "airport": "Apt",
     "Regional": "Reg",
     "regional": "Reg",
     "Municipal": "Muni",
@@ -79,13 +79,13 @@ def build_journey_spans(
         style,
     )
 
-    font = fonts.small_symbols
+    font = fonts.thum
     origin_spans = [
-        Span(TC(THEME_LOCATION_ORIGIN_ARROW), font, ">"),
+        # Span(TC(THEME_LOCATION_ORIGIN_ARROW), fonts.small_symbols, ">"),
         Span(TC(THEME_LOCATION_ORIGIN_FULL), font, f"{origin_name or 'Unknown'}"),
     ]
     destination_spans = [
-        Span(TC(THEME_LOCATION_DESTINATION_ARROW), font, "<"),
+        # Span(TC(THEME_LOCATION_DESTINATION_ARROW), fonts.small_symbols, "<"),
         Span(
             TC(THEME_LOCATION_DESTINATION_FULL),
             font,
@@ -195,7 +195,7 @@ class FullNameLabel:
                 scroller.clear()
 
         # Keep the airport code fixed; the arrow and description scroll after it.
-        font = fonts.small_symbols
+        font = fonts.thum
         origin = journey_display_code(flight.origin or cfg.journey_blank_filler, cfg)
         destination = journey_display_code(
             flight.destination or cfg.journey_blank_filler, cfg

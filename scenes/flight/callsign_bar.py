@@ -19,7 +19,7 @@ from __future__ import annotations
 from assets.airlines.lookups import icao_to_airline
 from display.scroller import Scroller
 from display.spans import Span, Spans, draw_spans
-from scenes.flight.airline_logo import airline_icao_from_flight
+from scenes.flight.airline_logo import AIRLINE_ICON_SIZE, airline_icao_from_flight
 from setup import fonts, screen
 from setup.configuration import Config
 from setup.themes import (
@@ -34,13 +34,14 @@ from setup.themes import (
 from utilities.flight import Flight
 
 # Shared layout constants (same as the original draw_callsign).
-BAR_STARTING_POSITION = (0, 20)
-BAR_PADDING = 2
-FLIGHT_NO_POSITION = (0, 23)
+BAR_STARTING_POSITION = (0, 22)
+BAR_PADDING = 1
+FLIGHT_NO_POSITION = (0, 25)
 FLIGHT_NO_TEXT_HEIGHT = 8
-FLIGHT_NO_FONT = fonts.small
-DATA_INDEX_POSITION = (52, 23)
-DATA_INDEX_FONT = fonts.extrasmall
+FLIGHT_NO_FONT = fonts.thum
+DATA_INDEX_POSITION = (52, 25)
+DATA_INDEX_FONT = fonts.thum
+BAR_CLEAR_TOP = AIRLINE_ICON_SIZE + 1
 
 
 def airline_name_from_flight(flight: Flight) -> str:
@@ -160,7 +161,10 @@ class CallsignBar:
         self.panel.draw_square(
             canvas,
             0,
-            BAR_STARTING_POSITION[1] - (FLIGHT_NO_TEXT_HEIGHT // 2),
+            max(
+                BAR_CLEAR_TOP,
+                BAR_STARTING_POSITION[1] - (FLIGHT_NO_TEXT_HEIGHT // 2),
+            ),
             screen.WIDTH - 1,
             BAR_STARTING_POSITION[1] + (FLIGHT_NO_TEXT_HEIGHT // 2),
             TC(THEME_BG),
@@ -180,7 +184,10 @@ class CallsignBar:
             self.panel.draw_square(
                 canvas,
                 DATA_INDEX_POSITION[0] - BAR_PADDING,
-                BAR_STARTING_POSITION[1] - (FLIGHT_NO_TEXT_HEIGHT // 2),
+                max(
+                    BAR_CLEAR_TOP,
+                    BAR_STARTING_POSITION[1] - (FLIGHT_NO_TEXT_HEIGHT // 2),
+                ),
                 screen.WIDTH,
                 BAR_STARTING_POSITION[1] + (FLIGHT_NO_TEXT_HEIGHT // 2),
                 TC(THEME_BG),
@@ -290,7 +297,10 @@ class AirlineNameBar:
             self.panel.draw_square(
                 canvas,
                 0,
-                BAR_STARTING_POSITION[1] - (FLIGHT_NO_TEXT_HEIGHT // 2),
+                max(
+                    BAR_CLEAR_TOP,
+                    BAR_STARTING_POSITION[1] - (FLIGHT_NO_TEXT_HEIGHT // 2),
+                ),
                 screen.WIDTH - 1,
                 BAR_STARTING_POSITION[1] + (FLIGHT_NO_TEXT_HEIGHT // 2),
                 TC(THEME_BG),
@@ -322,7 +332,10 @@ class AirlineNameBar:
             self.panel.draw_square(
                 canvas,
                 DATA_INDEX_POSITION[0] - BAR_PADDING,
-                BAR_STARTING_POSITION[1] - (FLIGHT_NO_TEXT_HEIGHT // 2),
+                max(
+                    BAR_CLEAR_TOP,
+                    BAR_STARTING_POSITION[1] - (FLIGHT_NO_TEXT_HEIGHT // 2),
+                ),
                 screen.WIDTH,
                 BAR_STARTING_POSITION[1] + (FLIGHT_NO_TEXT_HEIGHT // 2),
                 TC(THEME_BG),

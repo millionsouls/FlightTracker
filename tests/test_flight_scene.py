@@ -333,11 +333,11 @@ class TestAirlineLogoWidget:
         assert widget.width == 0
         assert widget.icon_drawn is False
 
-    def test_width_is_16_after_icon_drawn(self):
+    def test_width_is_18_after_icon_drawn(self):
         panel, canvas = _make_panel_and_canvas()
         widget = AirlineLogoWidget(panel)
         widget.draw(canvas, Flight(airline_icao="BCO"))
-        assert widget.width == 16
+        assert widget.width == 18
         assert widget.icon_drawn is True
 
     def test_draw_blanks_then_draws_image(self):
@@ -349,6 +349,7 @@ class TestAirlineLogoWidget:
         # Should have blanked the region (set_pixel calls) then drawn the image
         assert panel.set_pixel.called
         assert panel.draw_image.called
+        assert panel.draw_image.call_args.args[2].size == (18, 18)
 
     def test_draw_once_skips_repaint(self):
         panel, canvas = _make_panel_and_canvas()
@@ -495,19 +496,14 @@ class TestShortCodeLabel:
         panel, canvas = _make_panel_and_canvas()
         panel.draw_text.side_effect = lambda *a, **k: 5
         label = ShortCodeLabel(panel)
-        label.draw(canvas, Flight(origin="GLA", destination="LHR"), 17, 47)
-        # First draw_text call should be at x=17 (the text_x_origin)
+        label.draw(canvas, Flight(origin="GLA", destination="LHR"), 19, 45)
+        # First draw_text call should be at x=19 (the text_x_origin)
         first_call_args = panel.draw_text.call_args_list[0]
-        assert first_call_args[0][2] == 17  # x argument position
+        assert first_call_args[0][2] == 19  # x argument position
 
 
 class TestShortCodeFontSelection:
-    """4-char codes (ICAO / FAA local) drop to the compact font.
-
-    Plan: 4-char airport codes - D3/D4 decisions.  If EITHER end of the
-    journey is 4 characters, both ends render compact so the pair looks
-    even.
-    """
+    """All journey airport codes render with the thum font."""
 
     base, base_bold, compact = object(), object(), object()
 
@@ -552,7 +548,7 @@ class TestShortCodeFontSelection:
             canvas,
             Flight(origin=origin, destination=destination),
             text_x_origin,
-            63 if text_x_origin == 1 else 47,
+            screen.WIDTH - text_x_origin,
             icon_required=icon_required,
         )
         return [call.args[1] for call in panel.draw_text.call_args_list]
@@ -560,12 +556,12 @@ class TestShortCodeFontSelection:
     def test_draw_font_matrix_no_logo(self):
         from setup import fonts
 
-        # (origin, destination): if either is 4-char, both render compact.
+        # All airport codes use the same tiny font.
         cases = {
-            ("GLA", "LHR"): [fonts.large, fonts.large],
-            ("GLA", "98KY"): [fonts.regular, fonts.regular],
-            ("98KY", "LHR"): [fonts.regular, fonts.regular],
-            ("98KY", "0I8"): [fonts.regular, fonts.regular],
+            ("GLA", "LHR"): [fonts.thum, fonts.thum],
+            ("GLA", "98KY"): [fonts.thum, fonts.thum],
+            ("98KY", "LHR"): [fonts.thum, fonts.thum],
+            ("98KY", "0I8"): [fonts.thum, fonts.thum],
         }
         for (origin, destination), expected in cases.items():
             assert (
@@ -575,14 +571,21 @@ class TestShortCodeFontSelection:
     def test_draw_font_matrix_with_logo(self):
         from setup import fonts
 
-        assert self._draw("GLA", "LHR", text_x_origin=17, icon_required=True) == [
-            fonts.medium,
-            fonts.medium,
+        assert self._draw("GLA", "LHR", text_x_origin=19, icon_required=True) == [
+            fonts.thum,
+            fonts.thum,
         ]
-        assert self._draw("98KY", "0I8", text_x_origin=17, icon_required=True) == [
-            fonts.small,
-            fonts.small,
+        assert self._draw("98KY", "0I8", text_x_origin=19, icon_required=True) == [
+            fonts.thum,
+            fonts.thum,
         ]
+
+    def test_icon_layout_shifts_both_airport_codes_right_two_pixels(self):
+        panel, canvas = _make_panel_and_canvas()
+        label = ShortCodeLabel(panel)
+        label.draw(canvas, Flight(origin="GLA", destination="LHR"), 19, 45, True)
+
+        assert [call.args[2] for call in panel.draw_text.call_args_list] == [19, 46]
 
     def _draw_with_cfg(
         self, origin, destination, data, text_x_origin=1, icon_required=False
@@ -598,7 +601,7 @@ class TestShortCodeFontSelection:
             canvas,
             Flight(origin=origin, destination=destination),
             text_x_origin,
-            63 if text_x_origin == 1 else 47,
+            screen.WIDTH - text_x_origin,
             icon_required=icon_required,
         )
         return [(call.args[5], call.args[1]) for call in panel.draw_text.call_args_list]
@@ -606,27 +609,26 @@ class TestShortCodeFontSelection:
     def test_icao_format_converts_codes(self):
         from setup import fonts
 
-        # 4-char ICAO codes always render as the compact pair - the
-        # same rule 4-char FAA/ICAO codes already followed in IATA mode.
+        # IATA and ICAO codes render in the same tiny font.
         pairs = self._draw_with_cfg("GLA", "LHR", {"airport_code_format": "icao"})
-        assert dict(pairs) == {"EGPF": fonts.regular, "EGLL": fonts.regular}
+        assert dict(pairs) == {"EGPF": fonts.thum, "EGLL": fonts.thum}
 
     def test_iata_format_keeps_codes(self):
         from setup import fonts
 
         pairs = self._draw_with_cfg("GLA", "LHR", {"airport_code_format": "iata"})
-        assert dict(pairs) == {"GLA": fonts.large, "LHR": fonts.large}
+        assert dict(pairs) == {"GLA": fonts.thum, "LHR": fonts.thum}
 
     def test_icao_format_unknown_code_untouched(self):
         # FR24's QQQ filler is not in the reverse table; it renders as-is.
         from setup import fonts
 
         pairs = self._draw_with_cfg("QQQ", "GLA", {"airport_code_format": "icao"})
-        assert dict(pairs) == {"QQQ": fonts.regular, "EGPF": fonts.regular}
+        assert dict(pairs) == {"QQQ": fonts.thum, "EGPF": fonts.thum}
 
     def test_iata_format_home_code_bold(self):
         # Home comparison happens on display codes; the default format
-        # keeps bold-home working exactly as before.
+        # keeps both codes the same size.
         from setup import fonts
 
         pairs = self._draw_with_cfg(
@@ -634,47 +636,49 @@ class TestShortCodeFontSelection:
             "LHR",
             {"airport_code_format": "iata", "home_airport_code": "GLA"},
         )
-        assert dict(pairs) == {"GLA": fonts.large_bold, "LHR": fonts.large}
+        assert dict(pairs) == {"GLA": fonts.thum, "LHR": fonts.thum}
 
 
 class TestShortCodeGeometry:
     """Real font metrics: 4-char codes must clear arrow and panel edge.
 
-    Panel is 64px wide; no-icon text starts at x=1 (origin x1, arrow
-    columns x29-x32, destination x40); icon-mode text starts at x=17
-    (origin x17, arrow x39-x41, destination x44).
+    Panel is 64px wide; no-icon text starts at x=3 and icon-mode text
+    starts at x=19 after the 18px airline icon.
     """
 
     def test_four_char_no_icon_clears_arrow_and_panel(self):
         from setup import fonts
 
-        w = fonts.regular.text_width("98KY")
-        assert w == 24  # identical footprint to 3 x 8px
-        assert 1 + w <= 1 + _ARROW_TIP_OFFSET - _ARROW_WIDTH
-        assert 1 + _DEST_OFFSET + w <= 64
+        w = fonts.thum.text_width("98KY")
+        assert w == 16
+        assert 3 + w <= 3 + _ARROW_TIP_OFFSET - _ARROW_WIDTH
+        assert 3 + _DEST_OFFSET + w <= 64
 
-    def test_three_char_no_icon_unchanged(self):
+    def test_three_char_no_icon_fits(self):
         from setup import fonts
 
-        w = fonts.large.text_width("GLA")
-        assert w == 24
-        assert 1 + _DEST_OFFSET + w <= 64
+        w = fonts.thum.text_width("GLA")
+        assert w == 12
+        assert 3 + _DEST_OFFSET + w <= 64
 
     def test_four_char_icon_clears_arrow_and_panel(self):
         from setup import fonts
 
-        w = fonts.small.text_width("98KY")
-        assert w == 20  # identical footprint to 3 x 7px
-        assert 17 + w <= 17 + 25 - _ARROW_WIDTH_SMALL
-        assert 17 + 27 + w <= 64
+        w = fonts.thum.text_width("98KY")
+        assert w == 16
+        assert 19 + w <= 19 + 25 - _ARROW_WIDTH_SMALL
+        last_glyph = fonts.thum.get_glyph(ord("Y"))
+        assert last_glyph is not None
+        last_glyph_ink_end = (
+            19 + 27 + w - last_glyph.dwidth + last_glyph.bbx_xoff + last_glyph.bbx_w
+        )
+        assert last_glyph_ink_end <= screen.WIDTH
 
-    def test_mixed_pair_compact_sizes_fit(self):
-        # In a mixed pair the 3-char side also renders compact, so it is
-        # strictly narrower than the 4-char worst case already covered.
+    def test_mixed_pair_tiny_sizes_fit(self):
+        # A 3-char code is strictly narrower than the 4-char worst case.
         from setup import fonts
 
-        assert fonts.regular.text_width("GLA") <= fonts.regular.text_width("98KY")
-        assert fonts.small.text_width("GLA") <= fonts.small.text_width("98KY")
+        assert fonts.thum.text_width("GLA") <= fonts.thum.text_width("98KY")
 
 
 # ---------------------------------------------------------------------------
@@ -722,6 +726,12 @@ class TestCallsignBar:
         bar.draw(canvas, flights, 0)
         assert panel.draw_text.called
         assert panel.draw_square.called  # background blank
+        from setup import fonts
+
+        text_call = panel.draw_text.call_args
+        assert text_call.args[1] is fonts.tiny
+        assert text_call.args[3] == 25
+        assert all(call.args[2] == 18 for call in panel.draw_square.call_args_list)
 
     def test_cached_redraw_skips(self):
         panel, canvas = _make_panel_and_canvas()
@@ -765,6 +775,9 @@ class TestAirlineNameBar:
         bar.draw(canvas, flights, 0)
         assert bar.scroller is not None
         assert panel.draw_square.called  # background blank
+        assert any(
+            call.args[2] == 18 for call in panel.draw_square.call_args_list
+        )
 
     def test_rebuilds_scroller_on_flight_change(self):
         panel, canvas = _make_panel_and_canvas()
@@ -859,6 +872,9 @@ class TestBuildSpans:
         spans = scene.build_spans(cfg)
         assert len(spans) == 1
         assert spans[0].text == "BOEING 787"
+        from setup import fonts
+
+        assert spans[0].font is fonts.tiny
 
     def test_mode_1_returns_telemetry_spans(self):
         scene = self._make_scene(
@@ -873,6 +889,12 @@ class TestBuildSpans:
         assert "38000" in texts
         assert "480" in texts
         assert "270" in texts
+        from setup import fonts
+
+        assert all(span.font is fonts.tiny for span in spans if span.text not in "^~}*")
+        assert all(
+            span.font is fonts.small_symbols for span in spans if span.text in "^~}*"
+        )
 
     def test_mode_2_returns_custom_spans(self):
         scene = self._make_scene([Flight(plane="Boeing 787", callsign="BAW123")])
@@ -1054,6 +1076,11 @@ class TestJourneyCodeDisplay:
         origin_spans, dest_spans = build_journey_spans(cfg, flight)
         assert [span.text for span in origin_spans] == [">", "Glasgow Airport"]
         assert [span.text for span in dest_spans] == ["<", "Heathrow Airport"]
+        from setup import fonts
+
+        assert origin_spans[0].font is fonts.small_symbols
+        assert origin_spans[1].font is fonts.thum
+        assert dest_spans[1].font is fonts.thum
 
     def test_full_label_spans_iata_unchanged(self):
         from scenes.flight.journey.full_label import build_journey_spans
@@ -1086,15 +1113,15 @@ class TestJourneyCodeDisplay:
             with patch(
                 "scenes.flight.journey.full_label.Scroller", return_value=scroller
             ) as scroller_factory:
-                label.draw(canvas, flight, 17, 47, icon_required=True)
+                label.draw(canvas, flight, 19, 45, icon_required=True)
 
         drawn_text = [call.args[-1] for call in panel.draw_text.call_args_list]
         assert "EGPF" in drawn_text
         assert "EGLL" in drawn_text
         origin_scroll = scroller_factory.call_args_list[0].args
         destination_scroll = scroller_factory.call_args_list[1].args
-        assert origin_scroll[2] == 37
-        assert destination_scroll[2] == 37
+        assert origin_scroll[2] == 39
+        assert destination_scroll[2] == 39
         assert [span.text for span in origin_scroll[5]] == [">", "Glasgow Airport"]
         assert [span.text for span in destination_scroll[5]] == ["<", "Heathrow Airport"]
         assert ">" not in drawn_text
@@ -1142,3 +1169,23 @@ class TestJourneyCodeDisplay:
             scene.draw_journey()
             scene.draw_journey()
             assert scene.journey_label.reset.call_count == 1
+
+    def test_journey_starts_at_x3_without_logo(self):
+        scene, Config = self._scene_with_spy_label()
+        scene.airline_logo = MagicMock(width=0)
+        cfg = self._cfg(airport_display_style=1)
+
+        with patch.object(Config, "instance", return_value=cfg):
+            scene.draw_journey()
+
+        assert scene.journey_label.draw.call_args.args[2:5] == (3, 61, False)
+
+    def test_journey_starts_after_18px_logo(self):
+        scene, Config = self._scene_with_spy_label()
+        scene.airline_logo = MagicMock(width=18)
+        cfg = self._cfg(airport_display_style=1)
+
+        with patch.object(Config, "instance", return_value=cfg):
+            scene.draw_journey()
+
+        assert scene.journey_label.draw.call_args.args[2:5] == (19, 45, True)

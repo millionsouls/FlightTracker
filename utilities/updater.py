@@ -17,7 +17,7 @@ from version import VERSION
 
 logger = logging.getLogger("updater")
 
-GITHUB_OWNER = "ColinWaddell"
+GITHUB_OWNER = "millionsouls"
 GITHUB_REPO = "FlightTracker"
 GITHUB_TAGS_URL = f"https://api.github.com/repos/{GITHUB_OWNER}/{GITHUB_REPO}/tags"
 

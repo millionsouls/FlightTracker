@@ -1,35 +1,21 @@
-"""Build the bundled airport lookup tables from ourairports.com.
+"""Build derived airport lookup tables from world-airports.csv.
 
 Run from the assets directory; generates four files relative to the
 current working directory:
 
-  airports.json                IATA-keyed lookup (the bundled default)
-  airports-full.json           IATA + FAA/local + ICAO/gps codes (opt-in via
-                               the ``airport_lookup_full`` config toggle)
-  airports_icao_to_iata.json   ICAO -> IATA display-code mapping
-  airports_iata_to_icao.json   IATA -> ICAO display-code mapping (the
-                               reverse of the table above; used by the
-                               ICAO journey-code display option)
+  airports.json                IATA-keyed derived lookup
+  airports-full.json           IATA + FAA/local + ICAO/gps derived lookup
+  airports_icao_to_iata.json   derived ICAO -> IATA map
+  airports_iata_to_icao.json   derived IATA -> ICAO map
 """
 
 import csv
 import json
-import urllib.request
-
-url = "https://ourairports.com/airports.csv"
-
-OVERRIDES = {
-    "LTN": {
-        "country_name": "United Kingdom",
-        "municipality": "Luton, Bedfordshire",
-        "name": "London Luton Airport",
-    }
-}
 
 
 def _entry(row: dict) -> dict:
     return {
-        "name": row["name"].replace("–", "-"),
+        "name": row["name"],
         "country_name": row["country_name"],
         "municipality": row["municipality"],
     }
@@ -42,8 +28,8 @@ def _score(row: dict) -> float:
         return 0.0
 
 
-def build_airports(rows: list[dict]) -> tuple[dict, dict, dict]:
-    """Build the airport tables from ourairports CSV rows.
+def build_airports(rows: list[dict]) -> tuple[dict, dict, dict, dict]:
+    """Build derived airport tables from world-airports.csv rows.
 
     Returns ``(airports, full, ica0, iata0)``:
 
@@ -89,7 +75,7 @@ def build_airports(rows: list[dict]) -> tuple[dict, dict, dict]:
             if icao:
                 ica0[icao] = iata
                 iata0[iata] = icao
-            airports[iata] = OVERRIDES.get(iata, _entry(row))
+            airports[iata] = _entry(row)
 
     # Pass 2 - FAA/local, ICAO and GPS codes for rows the IATA table
     # does not cover.
@@ -127,8 +113,8 @@ def _write(path: str, data: dict) -> None:
 
 
 def main() -> None:
-    with urllib.request.urlopen(url) as r:
-        rows = list(csv.DictReader(line.decode("utf-8") for line in r))
+    with open("world-airports.csv", encoding="utf-8-sig", newline="") as file:
+        rows = list(csv.DictReader(file))
     airports, full, ica0, iata0 = build_airports(rows)
     _write("airports.json", airports)
     _write("airports-full.json", full)

@@ -134,14 +134,16 @@ def parse_route(flight: dict) -> RouteInfo | None:
         iata = (airport.get("iata") or "").strip()
         icao = (airport.get("icao") or "").strip()
         route.origin = iata or icao
-        fill_airport_details(route, "origin")
+        route.origin_icao = icao.upper()
+        fill_airport_details(route, "origin", icao_code=route.origin_icao)
 
     if arr:
         airport = arr.get("airport", {}) or {}
         iata = (airport.get("iata") or "").strip()
         icao = (airport.get("icao") or "").strip()
         route.destination = iata or icao
-        fill_airport_details(route, "destination")
+        route.destination_icao = icao.upper()
+        fill_airport_details(route, "destination", icao_code=route.destination_icao)
 
     airline = flight.get("airline", {}) or {}
     route.airline_icao = (airline.get("icao") or "").strip()

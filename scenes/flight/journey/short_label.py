@@ -14,13 +14,10 @@ from setup.themes import (
 )
 from utilities.flight import Flight
 
-# Vertical position of the IATA code baselines (unchanged from the
-# original draw_iata_mode - both codes share y=12).
+# Vertical position of the IATA code baselines (both codes share y=12).
 _IATA_Y = 12
 
-# Relative offsets from the text x-origin.  The original layout used
-# IATA_ORIGIN_X=1, IATA_DESTINATION_X=40, ARROW_TIP_X=34 - i.e. origin at
-# +0, arrow tip at +33, destination at +39 relative to the origin.
+# Relative offsets from the shifted text x-origin.
 _DEST_OFFSET = 39
 _ARROW_TIP_OFFSET = 33
 _ARROW_TIP_Y = 7
@@ -44,13 +41,8 @@ def _display_code(code: str) -> str:
 def _code_font(is_home: bool, pair_compact: bool, base, base_bold, compact):
     """Pick the font for one side of the short label.
 
-    Three-character codes (IATA) use the layout's base size - bold when
-    the code is the home field.  If either end of the journey needs the
-    compact size (a 4-char ICAO / FAA local code such as 98KY), both
-    ends use it so the pair renders at the same size; the compact
-    footprint is identical (4 x 6px = 3 x 8px), so the fixed arrow and
-    destination offsets still clear.  No bold cut exists below 7px, so
-    compact codes always render plain.
+    The caller supplies the desired type styles.  On this display all
+    three are the tiny font, so home and compact variants remain uniform.
     """
     if pair_compact:
         return compact
@@ -80,8 +72,8 @@ class ShortCodeLabel:
         available_width: int,
         icon_required: bool = False,
     ) -> None:
-        # icon_required indicates icon mode is enabled; text_x_origin > 1
-        # confirms an icon was actually drawn (x=17 vs x=1).  If icon
+        # icon_required indicates icon mode is enabled; text_x_origin > 3
+        # confirms an icon was actually drawn (x=19 vs x=3). If icon
         # mode is on but no icon resolved, fall back to the no-icon layout.
         with_icon = icon_required and text_x_origin > 1
 
@@ -126,9 +118,9 @@ class ShortCodeLabel:
         font = _code_font(
             origin == home_code,
             pair_compact,
-            fonts.large,
-            fonts.large_bold,
-            fonts.regular,
+            fonts.thum,
+            fonts.thum,
+            fonts.thum,
         )
         self.panel.draw_text(
             canvas, font, origin_x, _IATA_Y, TC(THEME_LOCATION_ORIGIN), origin
@@ -136,9 +128,9 @@ class ShortCodeLabel:
         font = _code_font(
             destination == home_code,
             pair_compact,
-            fonts.large,
-            fonts.large_bold,
-            fonts.regular,
+            fonts.thum,
+            fonts.thum,
+            fonts.thum,
         )
         self.panel.draw_text(
             canvas, font, dest_x, _IATA_Y, TC(THEME_LOCATION_DESTINATION), destination
@@ -190,9 +182,9 @@ class ShortCodeLabel:
         font = _code_font(
             origin == home_code,
             pair_compact,
-            fonts.medium,
-            fonts.medium_bold,
-            fonts.small,
+            fonts.thum,
+            fonts.thum,
+            fonts.thum,
         )
         self.panel.draw_text(
             canvas, font, origin_x, _IATA_Y, TC(THEME_LOCATION_ORIGIN), origin
@@ -200,9 +192,9 @@ class ShortCodeLabel:
         font = _code_font(
             destination == home_code,
             pair_compact,
-            fonts.medium,
-            fonts.medium_bold,
-            fonts.small,
+            fonts.thum,
+            fonts.thum,
+            fonts.thum,
         )
         self.panel.draw_text(
             canvas, font, dest_x, _IATA_Y, TC(THEME_LOCATION_DESTINATION), destination

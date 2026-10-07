@@ -16,7 +16,7 @@ MarkupSafe==3.0.3
 mdurl==0.1.2
 pillow==12.3.0
 pycparser==3.0
-pygame==2.6.1
+pygame-ce
 Pygments==2.20.0
 qrcode==8.2
 requests==2.32.4

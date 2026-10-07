@@ -120,7 +120,8 @@ class TestAirportCommand:
         entry = payload["airports"][0]
         assert entry["found"] is True
         assert "Glasgow" in entry["name"]
-        assert payload["table"] == "airports.json"
+        assert payload["source"] == "world-airports.csv"
+        assert payload["extended"] is False
 
     def test_mixed_codes_exit_code(self, capsys):
         code, payload, _ = run(capsys, "lookup", "airport", "GLA", "ZZZZ")
@@ -137,7 +138,7 @@ class TestAirportCommand:
         from utilities import overhead_utilities as oh
 
         monkeypatch.setattr(
-            oh, "_selected_airports_filename", lambda: "airports-full.json"
+            oh, "_airport_lookup_extended", lambda: True
         )
         oh.reset_airports_cache()
         try:
@@ -148,8 +149,8 @@ class TestAirportCommand:
         assert payload["airports"][0]["name"] == "Central Kentucky Regional Airport"
 
     def test_extended_flag_resolves_icao_code(self, capsys, monkeypatch):
-        # --extended flips the table in memory; the saved setting is left
-        # alone (the hint test above proves the default stays airports.json).
+        # --extended flips the lookup in memory; the saved setting is left
+        # alone (the hint test above proves default lookup is IATA-only).
         from utilities import overhead_utilities as oh
 
         oh.reset_airports_cache()
@@ -158,7 +159,8 @@ class TestAirportCommand:
         finally:
             oh.reset_airports_cache()
         assert code == 0
-        assert payload["table"] == "airports-full.json"
+        assert payload["source"] == "world-airports.csv"
+        assert payload["extended"] is True
         assert payload["airports"][0]["name"] == "Central Kentucky Regional Airport"
         # No hint - the extended table was consulted.
         assert "hint" not in payload

@@ -85,7 +85,7 @@ def telemetry_changed(old: list, new: list) -> bool:
 # Plane details (scrolling bar)
 # ---------------------------------------------------------------------------
 
-PLANE_DETAILS_Y = 30
+PLANE_DETAILS_Y = 31
 PLANE_DETAILS_HEIGHT = 8
 
 # ---------------------------------------------------------------------------
@@ -329,14 +329,14 @@ class FlightScene:
             return
 
         # Journey text starts after the icon (1px gap) when an icon was
-        # drawn; otherwise starts at x=1 (the original margin).
+        # drawn; otherwise use a 3px left margin.
         icon_width = self.airline_logo.width
         if icon_width:
-            # Icon mode: start at x=16 (no gap) and extend 1px wider.
+            # Leave a 1px gap after the 18px airline icon.
             journey_x = icon_width + 1
             journey_width = screen.WIDTH - journey_x
         else:
-            journey_x = 1
+            journey_x = 3
             journey_width = screen.WIDTH - journey_x
         icon_required = icon_width > 0
 
@@ -361,7 +361,7 @@ class FlightScene:
 
     def model_spans(self) -> Spans:
         text = self.flights[self.flight_index].plane
-        return [Span(TC(THEME_PLANE), fonts.regular, text.upper())]
+        return [Span(TC(THEME_PLANE), fonts.tiny, text.upper())]
 
     def telemetry_spans(self, cfg) -> Spans:
         flight = self.flights[self.flight_index]
@@ -387,22 +387,23 @@ class FlightScene:
             speed_val = format_number(int(ground_speed_kts * 1.852), sep)
             speed_unit = "kmh"
 
-        f = fonts.small_symbols
+        f = fonts.tiny
+        symbols = fonts.small_symbols
         val = TC(THEME_PLANE_TLM)
         ico = TC(THEME_PLANE_TLM_UNITS)
 
         return [
-            Span(ico, f, "^"),
+            Span(ico, symbols, "^"),
             Span(val, f, alt_val),
             Span(ico, f, alt_unit),
             Span(val, f, " "),
-            Span(ico, f, "~"),
+            Span(ico, symbols, "~"),
             Span(val, f, speed_val),
             Span(ico, f, speed_unit),
             Span(val, f, " "),
-            Span(ico, f, "}"),
+            Span(ico, symbols, "}"),
             Span(val, f, format_number(int(heading), sep)),
-            Span(ico, f, "*"),
+            Span(ico, symbols, "*"),
         ]
 
     def draw_plane_details(self) -> None:

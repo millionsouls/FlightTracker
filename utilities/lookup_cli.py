@@ -172,11 +172,10 @@ def _config():
 
 
 def _apply_extended_table(cfg, args: argparse.Namespace) -> None:
-    """--extended: use airports-full.json for this lookup (in memory only).
+    """--extended: include local, ICAO and GPS CSV codes for this lookup.
 
     Flips the ``airport_lookup_full`` setting for the lifetime of the
-    command without saving it, and resets the airport-name cache so the
-    extended table is the one actually loaded.
+    command without saving it, and resets the airport-name cache.
     """
     if not getattr(args, "extended", False):
         return
@@ -184,7 +183,7 @@ def _apply_extended_table(cfg, args: argparse.Namespace) -> None:
 
     cfg.set("airport_lookup_full", True)
     oh.reset_airports_cache()
-    logger.debug("airport table: forced to airports-full.json for this lookup")
+    logger.debug("airport lookup: enabled extended CSV codes for this lookup")
 
 
 def _print(payload: dict) -> None:
@@ -404,14 +403,12 @@ def _run_callsign(args: argparse.Namespace) -> int:
 
 
 def _run_airport(args: argparse.Namespace) -> int:
-    import os
-
     from setup.configuration import Config
     from utilities.overhead_utilities import airport_info
 
     cfg = Config.reload()
     _apply_extended_table(cfg, args)
-    table = "airports-full.json" if cfg.airport_lookup_full else "airports.json"
+    extended = bool(cfg.airport_lookup_full)
     results = []
     for raw in args.codes:
         code = raw.strip().upper()
@@ -421,12 +418,16 @@ def _run_airport(args: argparse.Namespace) -> int:
         else:
             results.append({"code": code, "found": False})
 
-    payload = {"table": os.path.basename(table), "airports": results}
+    payload = {
+        "source": "world-airports.csv",
+        "extended": extended,
+        "airports": results,
+    }
     missed = [r["code"] for r in results if not r["found"]]
-    if missed and not cfg.airport_lookup_full:
+    if missed and not extended:
         payload["hint"] = (
-            "airport_lookup_full is off - the extended table (FAA local "
-            "+ ICAO/gps codes) was not consulted"
+            "airport_lookup_full is off - local, ICAO and GPS codes were "
+            "not consulted"
         )
     _print(payload)
     return EXIT_OK if any(r["found"] for r in results) else EXIT_NOT_FOUND
@@ -542,7 +543,7 @@ def _add_extended_flag(sp: argparse.ArgumentParser) -> None:
     sp.add_argument(
         "--extended",
         action="store_true",
-        help="use the extended airport table (FAA local + ICAO/gps codes) "
+        help="include local, ICAO and GPS airport codes from the CSV "
         "for this lookup, without saving the airport_lookup_full setting",
     )
 

@@ -102,7 +102,9 @@ def _row_to_route(row: dict) -> RouteInfo | None:
     route = RouteInfo()
     route.origin = origin
     route.destination = destination
+    route.origin_icao = (row.get("dep_icao") or "").strip().upper()
+    route.destination_icao = (row.get("arr_icao") or "").strip().upper()
     route.airline_icao = clean_field(row.get("airline_icao"))
-    fill_airport_details(route, "origin")
-    fill_airport_details(route, "destination")
+    fill_airport_details(route, "origin", icao_code=route.origin_icao)
+    fill_airport_details(route, "destination", icao_code=route.destination_icao)
     return route

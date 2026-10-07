@@ -3,9 +3,8 @@
 Queries the free hexdb.io database for an aircraft's scheduled route given
 its callsign.  hexdb answers with an airport-pair string (``"EGPH-EGLL"``
 or the longer ``" Callsign - ORIG - DEST"`` style), using ICAO identifiers;
-they are converted to the IATA codes the display expects using the bundled
-airport table, with airport names/municipalities enriched from the bundled
-airports database.
+they are converted to the IATA codes the display expects using
+world-airports.csv, which also supplies the displayed airport details.
 """
 
 from __future__ import annotations
@@ -91,10 +90,12 @@ class RouteProvider:
         route = RouteInfo()
         if origin_iata:
             route.origin = origin_iata
-            fill_airport_details(route, "origin")
+            route.origin_icao = origin_icao
+            fill_airport_details(route, "origin", icao_code=origin_icao)
         if dest_iata:
             route.destination = dest_iata
-            fill_airport_details(route, "destination")
+            route.destination_icao = dest_icao
+            fill_airport_details(route, "destination", icao_code=dest_icao)
 
         logger.debug(
             "hexdb route for %r: %s->%s", callsign, route.origin, route.destination

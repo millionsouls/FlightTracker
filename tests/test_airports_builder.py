@@ -53,11 +53,20 @@ class TestIataPass:
         _, _, ica0, _ = builder.build_airports([row(iata_code="LEX", icao_code="")])
         assert "" not in ica0
 
-    def test_overrides_win(self):
+    def test_csv_row_is_source_of_truth(self):
         airports, _, _, _ = builder.build_airports(
-            [row(iata_code="LTN", icao_code="EGGW", local_code="")]
+            [
+                row(
+                    iata_code="LTN",
+                    icao_code="EGGW",
+                    local_code="",
+                    name="CSV Airport Name",
+                    municipality="CSV Municipality",
+                )
+            ]
         )
-        assert airports["LTN"]["name"] == "London Luton Airport"
+        assert airports["LTN"]["name"] == "CSV Airport Name"
+        assert airports["LTN"]["municipality"] == "CSV Municipality"
 
     def test_full_is_a_copy_iata_untouched_by_locals(self):
         airports, full, _, _ = builder.build_airports([row(local_code="0I8")])

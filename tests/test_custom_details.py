@@ -208,7 +208,27 @@ class TestBuildCustomSpans:
         cfg = make_cfg()
         spans = build_custom_spans("{plane}", flight, cfg)
         assert len(spans) == 1
-        assert spans[0].text == "787-9"
+        assert spans[0].text == "B789"
+        from setup import fonts
+
+        assert spans[0].font is fonts.tiny
+
+    def test_plane_field_uses_icao_type_code(self):
+        cfg = make_cfg()
+        aircraft_types = {
+            "Airbus A320-214": "A320",
+            "Boeing 777-300ER": "B77W",
+            "Boeing 737-800": "B738",
+            "Bombardier CS300": "BCS3",
+            "Eurocopter EC145": "EC45",
+            "A320": "A320",
+            "Unknown model (BCS3)": "BCS3",
+            "Boeing 737": "B738",
+        }
+
+        for plane, expected in aircraft_types.items():
+            spans = build_custom_spans("{plane}", make_flight(plane=plane), cfg)
+            assert [span.text for span in spans] == [expected]
 
     def test_static_plane_is_separated_from_custom_scrolling_spans(self):
         flight = make_flight()
@@ -219,8 +239,14 @@ class TestBuildCustomSpans:
         )
 
         assert plane is not None
-        assert plane.text == "787-9"
+        assert plane.text == "B789"
         assert [span.text for span in spans] == [" | ", "BAW123"]
+
+    def test_unrecognized_plane_name_is_not_rendered_as_an_icao_code(self):
+        spans = build_custom_spans(
+            "{plane}", make_flight(plane="Unrecognized Aircraft Model"), make_cfg()
+        )
+        assert [span.text for span in spans] == [NOT_DEFINED_TEXT]
 
     def test_callsign_span(self):
         flight = make_flight()

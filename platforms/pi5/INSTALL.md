@@ -14,11 +14,13 @@ This guide covers installing FlightTracker on a Raspberry Pi 5 using Adafruit's 
 
 ## Automated install (recommended)
 
+From the root of a local FlightTracker checkout on the Pi, run:
+
 ```bash
-curl -sSL https://raw.githubusercontent.com/ColinWaddell/FlightTracker/main/platforms/pi5/install.sh | bash
+bash platforms/pi5/install.sh
 ```
 
-The installer detects your hardware, clones the repo, creates a virtual environment, installs dependencies, and sets up a systemd service.
+The installer detects your hardware, copies the local checkout to `/home/<user>/FlightTracker` (or uses it in place if it is already there), creates a virtual environment, installs dependencies, and sets up a systemd service.
 
 ---
 
@@ -31,12 +33,10 @@ sudo apt-get update
 sudo apt-get dist-upgrade
 ```
 
-### 2. Clone and install FlightTracker
+### 2. Install FlightTracker from a local checkout
 
 ```bash
-cd /home/pi
-git clone https://github.com/ColinWaddell/FlightTracker
-cd FlightTracker
+cd /path/to/FlightTracker
 python3 -m venv env
 source env/bin/activate
 pip install -r platforms/pi5/requirements.txt

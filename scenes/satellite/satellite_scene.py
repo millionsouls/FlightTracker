@@ -51,7 +51,6 @@ GLOW_ANIMATION_ENABLED = True       # Use pulsing glow instead of blinking
 MOTION_VECTORS_ENABLED = False       # Show direction of travel arrows
 GRID_LINES_ENABLED = True           # Show elevation reference circles (30°, 60°)
 CARDINAL_LABELS_ENABLED = False     # Show N/S/E/W direction labels
-INFO_DISPLAY_ENABLED = False        # Show satellite name + Az/El info
 BACKGROUND_ENABLED = True           # Draw dark background for contrast
 
 # How long (in seconds) to display each satellite's telemetry before cycling
@@ -388,13 +387,7 @@ class SatelliteScene:
         if pos is not None:
             az, el = pos
             
-            # Display satellite info (name + Az/El) if enabled
-            if INFO_DISPLAY_ENABLED:
-                azel_plot.draw_satellite_info(
-                    self.panel, self.canvas, window.name, az, el, window.tle_index
-                )
-            
-            telemetry = compute_telemetry(window, az, el)
+            telemetry = compute_telemetry(window)
             cfg = Config.instance()
             
             if telemetry is not None:
@@ -415,25 +408,38 @@ class SatelliteScene:
         # ================================================================
         # Build text elements for this frame
         # ================================================================
-        f = fonts.extrasmall
+        f = fonts.thum
         new_texts: dict[str, PlacedSpan] = {
-            "name": PlacedSpan(Span(YELLOW, f, window.name), TEXT_COL_X, NAME_Y),
-            "spd_label": PlacedSpan(Span(PEACH, f, "Speed"), TEXT_COL_X, LINE1_Y),
-            "spd_value": PlacedSpan(Span(WHITE, f, speed_val), TEXT_COL_X, LINE2_Y),
-            "spd_unit": PlacedSpan(Span(PINK, f, speed_unit), 0, LINE2_Y),
-            "alt_label": PlacedSpan(Span(PEACH, f, "Altitude"), TEXT_COL_X, LINE3_Y),
-            "alt_value": PlacedSpan(Span(WHITE, f, alt_val), TEXT_COL_X, LINE4_Y),
-            "alt_unit": PlacedSpan(Span(PINK, f, alt_unit), 0, LINE4_Y),
+            "name": PlacedSpan(Span(YELLOW, f, window.name), TEXT_COL_X, 5),
+            #"spd_label": PlacedSpan(Span(PEACH, f, "SPD"), TEXT_COL_X, LINE1_Y),
+            "spd_value": PlacedSpan(Span(WHITE, f, speed_val), TEXT_COL_X, 11),
+            "spd_unit": PlacedSpan(Span(PINK, fonts.tiny, speed_unit), 0, 11),
+            #"alt_label": PlacedSpan(Span(PEACH, f, "ALT"), TEXT_COL_X, LINE3_Y),
+            "alt_value": PlacedSpan(Span(WHITE, f, alt_val), TEXT_COL_X, 16),
+            "alt_unit": PlacedSpan(Span(PINK, fonts.tiny, alt_unit), 0, 16),
+            "az_value": PlacedSpan(Span(WHITE, f, f"{az:.1f}"), TEXT_COL_X, 22),
+            "az_unit": PlacedSpan(Span(PINK, fonts.tiny, "*"), 0, 22),
+            "ecc_value": PlacedSpan(Span(WHITE, f, f"{window.eccentricity:.4f}"), 6, 27),
+            "ecc_unit": PlacedSpan(Span(PINK, fonts.tiny, "e"), TEXT_COL_X, 27),
+            "argp_value": PlacedSpan(Span(WHITE, f, f"{window.argument_of_perigee:.1f}"), TEXT_COL_X, 32),
+            "argp_unit": PlacedSpan(Span(PINK, fonts.tiny, "*"), 0, 32),
         }
 
         # Compute unit x-positions (right after the value text)
-        for key in ("spd_unit", "alt_unit"):
+        for key in ("spd_unit", "alt_unit", "az_unit", "argp_unit"):
             val_key = key.replace("_unit", "_value")
             val_ps = new_texts[val_key]
             unit_ps = new_texts[key]
-            # Width of value text in pixels
-            val_width = font_text_width(val_ps.span.font, val_ps.span.text)
-            new_texts[key] = unit_ps._replace(x=val_ps.x + val_width)
+
+            val_width = font_text_width(
+                val_ps.span.font,
+                val_ps.span.text,
+            )
+
+            new_texts[key] = unit_ps._replace(
+                x=val_ps.x + val_width
+            )
+
 
         black = Colour(0, 0, 0)
 
@@ -461,8 +467,6 @@ class SatelliteScene:
 
 def compute_telemetry(
     window: passes_mod.PassWindow,
-    az_deg: float,
-    el_deg: float,
 ) -> tuple[float, float] | None:
     """
     Estimate orbital speed and altitude from the pass trajectory.
@@ -472,8 +476,6 @@ def compute_telemetry(
 
     Args:
         window: PassWindow containing trajectory data
-        az_deg: current azimuth in degrees (unused but for future extension)
-        el_deg: current elevation in degrees (unused but for future extension)
 
     Returns:
         (speed_kmh, altitude_km) tuple, or None if unavailable

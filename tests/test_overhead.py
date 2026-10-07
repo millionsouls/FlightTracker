@@ -61,7 +61,7 @@ class TestDistanceFromHome:
 
 class TestAirportInfo:
     def test_known_airport(self):
-        # GLA should be in the bundled airports.json
+        # GLA is present in world-airports.csv.
         info = airport_info("GLA")
         assert isinstance(info, dict)
         # It may or may not have "name" but it should be a dict
@@ -83,20 +83,18 @@ class TestAirportInfo:
 
 
 class TestAirportLookupToggle:
-    """The airport_lookup_full toggle selects the bundled table.
+    """The airport_lookup_full toggle selects CSV lookup identifiers.
 
-    The opt-in airports-full.json adds FAA/local-code keys (0I8, 98KY)
-    for US municipal airports and hospital heliports, plus ICAO/gps
-    codes (KRGA) for airports without an IATA code.  Both files ship
-    in assets/; tests exercise the real ones.
+    Extended lookup adds FAA/local-code keys (0I8, 98KY) plus ICAO/GPS
+    codes (KRGA) for airports without an IATA code.
     """
 
     @pytest.fixture
     def lookup(self, monkeypatch):
         from utilities import overhead_utilities as oh
 
-        def use(filename):
-            monkeypatch.setattr(oh, "_selected_airports_filename", lambda: filename)
+        def use(extended):
+            monkeypatch.setattr(oh, "_airport_lookup_extended", lambda: extended)
             oh.reset_airports_cache()
 
         yield use
@@ -104,37 +102,37 @@ class TestAirportLookupToggle:
         oh.reset_airports_cache()
 
     def test_default_table_has_no_local_codes(self, lookup):
-        lookup("airports.json")
+        lookup(False)
         assert airport_info("0I8") == {}
         assert airport_info("98KY") == {}
 
     def test_full_table_resolves_local_codes(self, lookup):
-        lookup("airports-full.json")
+        lookup(True)
         info = airport_info("0I8")
         assert info["name"] == "Cynthiana-Harrison County Airport"
         assert airport_info("98KY")["municipality"] == "Corbin"
 
     def test_full_table_resolves_icao_style_codes(self, lookup):
-        # Central Kentucky Regional has no IATA code; OurAirports knows it
+        # Central Kentucky Regional has no IATA code; world-airports.csv knows it
         # only by its gps code (KRGA), which is what route services answer
         # with.
-        lookup("airports-full.json")
+        lookup(True)
         info = airport_info("KRGA")
         assert info["name"] == "Central Kentucky Regional Airport"
         assert info["municipality"] == "Richmond"
-        lookup("airports.json")
+        lookup(False)
         assert airport_info("KRGA") == {}
 
     def test_full_table_keeps_iata_entries(self, lookup):
-        lookup("airports-full.json")
+        lookup(True)
         assert airport_name("GLA") != ""
 
     def test_toggle_switches_tables(self, lookup):
-        lookup("airports.json")
+        lookup(False)
         assert airport_info("0I8") == {}
-        lookup("airports-full.json")
+        lookup(True)
         assert airport_info("0I8") != {}
-        lookup("airports.json")
+        lookup(False)
         assert airport_info("0I8") == {}
 
 

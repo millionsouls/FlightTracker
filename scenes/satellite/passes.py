@@ -41,21 +41,19 @@ DEBUG_FAKE_PASS = False
 # Data types
 # ---------------------------------------------------------------------------
 
-
 @dataclass
 class PassWindow:
     """A single overhead pass for one satellite."""
-
     name: str
     tle_index: int
     aos: datetime.datetime
     los: datetime.datetime
     max_el: float
+    eccentricity: float
+    argument_of_perigee: float
     trajectory: list[tuple[float, float, float, datetime.datetime]] = field(
         default_factory=list
     )
-    # Each entry: (azimuth_deg, elevation_deg, range_km, utc_time)
-
 
 # ---------------------------------------------------------------------------
 # Coordinate math (no external deps)
@@ -202,14 +200,15 @@ def fake_pass_window() -> PassWindow:
         trajectory.append((az, el, 408.0, t))
 
     return PassWindow(
-        name="ISS (Zayara)",
+        name="ISS (ZARYA)",
         tle_index=0,
         aos=aos,
         los=los,
         max_el=55.0,
+        eccentricity=0.0005,
+        argument_of_perigee=87.0,
         trajectory=trajectory,
     )
-
 
 # ---------------------------------------------------------------------------
 # Public API
@@ -345,18 +344,24 @@ def refine_pass(
                 max_el = el
         t += fine
 
-    if not trajectory or max_el < min_elevation:
-        return None
+        if not trajectory or max_el < min_elevation:
+            return None
 
-    los = trajectory[-1][3]
-    return PassWindow(
-        name=name,
-        tle_index=idx,
-        aos=aos,
-        los=los,
-        max_el=max_el,
-        trajectory=trajectory,
-    )
+        los = trajectory[-1][3]
+
+        eccentricity = float(sat.ecco)
+        argument_of_perigee = math.degrees(float(sat.argpo))
+
+        return PassWindow(
+            name=name,
+            tle_index=idx,
+            aos=aos,
+            los=los,
+            max_el=max_el,
+            eccentricity=eccentricity,
+            argument_of_perigee=argument_of_perigee,
+            trajectory=trajectory,
+        )
 
 
 def current_passes(windows: list[PassWindow]) -> list[PassWindow]:

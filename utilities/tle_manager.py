@@ -58,7 +58,7 @@ GP_URL = "https://celestrak.org/NORAD/elements/gp.php?CATNR={catnr}&FORMAT=TLE"
 
 def fetch_tle(norad_id: int) -> tuple[str, str, str] | None:
     """Fetch a single TLE by NORAD catalog number. Returns (name, l1, l2) or None."""
-    url = GP_URL
+    url = GP_URL.format(catnr=norad_id)
     try:
         req = urllib.request.Request(
             url,

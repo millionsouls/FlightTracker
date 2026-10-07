@@ -26,7 +26,7 @@ from __future__ import annotations
 import logging
 import re
 
-from PIL import Image
+from PIL import Image, ImageEnhance
 
 from assets.airlines.lookups import (
     AirlineLogoNotFound,
@@ -300,8 +300,12 @@ class AirlineLogoWidget:
         )
         icon = _load_airline_icon(prefix)
         if icon is not None:
+            icon = ImageEnhance.Contrast(icon).enhance(1.25)
+            icon = ImageEnhance.Brightness(icon).enhance(1.05)
+
             icon = icon.resize(
-                (AIRLINE_ICON_SIZE, AIRLINE_ICON_SIZE), Image.Resampling.NEAREST
+                (AIRLINE_ICON_SIZE, AIRLINE_ICON_SIZE),
+                Image.Resampling.NEAREST,
             )
             self.panel.draw_image(canvas, AIRLINE_ICON_X, AIRLINE_ICON_Y, icon)
             self._icon_drawn = True

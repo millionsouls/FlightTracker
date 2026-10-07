@@ -1524,6 +1524,13 @@ def update_check():
     return info, 200
 
 
+@app.route("/update/notes", methods=["POST"])
+@login_required
+def update_notes():
+
+    return {"notes": None}, 200
+
+
 @app.route("/update/apply", methods=["POST"])
 @login_required
 def update_apply():

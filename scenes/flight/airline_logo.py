@@ -300,6 +300,7 @@ class AirlineLogoWidget:
         )
         icon = _load_airline_icon(prefix)
         if icon is not None:
+            icon = icon.convert("RGBA")
             icon = ImageEnhance.Contrast(icon).enhance(1.25)
             icon = ImageEnhance.Brightness(icon).enhance(1.05)
 

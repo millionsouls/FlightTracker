@@ -344,24 +344,24 @@ def refine_pass(
                 max_el = el
         t += fine
 
-        if not trajectory or max_el < min_elevation:
-            return None
+    if not trajectory or max_el < min_elevation:
+        return None
 
-        los = trajectory[-1][3]
+    los = trajectory[-1][3]
 
-        eccentricity = float(sat.ecco)
-        argument_of_perigee = math.degrees(float(sat.argpo))
+    eccentricity = float(sat.ecco)
+    argument_of_perigee = math.degrees(float(sat.argpo))
 
-        return PassWindow(
-            name=name,
-            tle_index=idx,
-            aos=aos,
-            los=los,
-            max_el=max_el,
-            eccentricity=eccentricity,
-            argument_of_perigee=argument_of_perigee,
-            trajectory=trajectory,
-        )
+    return PassWindow(
+        name=name,
+        tle_index=idx,
+        aos=aos,
+        los=los,
+        max_el=max_el,
+        eccentricity=eccentricity,
+        argument_of_perigee=argument_of_perigee,
+        trajectory=trajectory,
+    )
 
 
 def current_passes(windows: list[PassWindow]) -> list[PassWindow]:

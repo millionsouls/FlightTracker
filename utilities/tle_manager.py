@@ -12,6 +12,9 @@ request is only sent for satellites that are missing from the cache or whose
 cached entry has expired.  A refresh only replaces the entries that were
 successfully retrieved - everything else is left untouched.
 
+Bundled TLE data in assets/tle/tle_cache.json seeds the cache when no usable
+runtime cache exists, so pass prediction can start during an initial outage.
+
 Retry delays after failed fetches are persisted alongside the TLEs, so a
 restart does not trigger an immediate retry storm.
 
@@ -24,12 +27,13 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import threading
 import time
 import urllib.error
 import urllib.request
+from pathlib import Path
 from typing import NamedTuple
-import os
 
 from setup.configuration import CONFIG_PATH, ROOT_PATH, Config, migrate_legacy_json
 
@@ -42,10 +46,11 @@ logger = logging.getLogger(__name__)
 # debug mode (no network requests at all).
 CACHE_ONLY_ENV = "TLE_CACHE_ONLY"
 
-TLE_CACHE_TTL = 3 * 86400  # 7 days
+TLE_CACHE_TTL = 3 * 86400  # 3 days
 TLE_CACHE_PATH = migrate_legacy_json(
     ROOT_PATH / "tle_cache.json", CONFIG_PATH.parent / "tle_cache.json"
 )
+BACKUP_TLE_CACHE_PATH = ROOT_PATH / "assets" / "tle" / "tle_cache.json"
 CACHE_VERSION = 2
 HTTP_TIMEOUT = 15
 
@@ -112,7 +117,6 @@ def fetch_tle(norad_id: int) -> tuple[str, str, str] | None:
     try:
         req = urllib.request.Request(
             url,
-            headers={"User-Agent": "FlightTracker/1.0 (raspberry-pi)"},
         )
         with urllib.request.urlopen(req, timeout=HTTP_TIMEOUT) as resp:
             status = resp.status
@@ -150,19 +154,19 @@ def norad_id_from_line1(line1: str) -> int | None:
 # ---------------------------------------------------------------------------
 
 
-def load_cache() -> tuple[dict[int, CacheEntry], dict[int, RetryState], float]:
-    """Load the per-satellite cache, persisted retry state and request block.
-
-    Returns ({}, {}, 0.0) if the file is missing or unreadable.  Also
-    understands the legacy format ({"timestamp": ..., "tles": [...]}) and
-    converts it, using the catalog number embedded in each TLE.  Files
-    written before retry/block persistence existed simply lack those keys.
-    """
+def _load_cache_file(
+    path: Path,
+) -> tuple[dict[int, CacheEntry], dict[int, RetryState], float]:
+    """Parse one current or legacy TLE cache file."""
     try:
-        data = json.loads(TLE_CACHE_PATH.read_text())
-    except Exception:
+        data = json.loads(path.read_text())
+    except FileNotFoundError:
+        return {}, {}, 0.0
+    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+        logger.warning("Unable to read TLE cache %s: %s", path, exc)
         return {}, {}, 0.0
     if not isinstance(data, dict):
+        logger.warning("Skipping malformed TLE cache file %s", path)
         return {}, {}, 0.0
 
     entries: dict[int, CacheEntry] = {}
@@ -210,6 +214,32 @@ def load_cache() -> tuple[dict[int, CacheEntry], dict[int, RetryState], float]:
     return entries, retry, blocked_until
 
 
+def load_cache() -> tuple[dict[int, CacheEntry], dict[int, RetryState], float]:
+    """Load runtime cache, using the bundled cache for missing TLEs.
+
+    Returns ({}, {}, 0.0) if the file is missing or unreadable.  Also
+    understands the legacy format ({"timestamp": ..., "tles": [...]}) and
+    converts it, using the catalog number embedded in each TLE.  Files
+    written before retry/block persistence existed simply lack those keys.
+    The runtime cache wins unless a bundled entry has a newer fetch time.
+    """
+    backup_entries, _backup_retry, _backup_blocked_until = _load_cache_file(
+        BACKUP_TLE_CACHE_PATH
+    )
+    entries, retry, blocked_until = _load_cache_file(TLE_CACHE_PATH)
+    backup_count = 0
+    for nid, entry in backup_entries.items():
+        if nid not in entries or entry.fetched_at > entries[nid].fetched_at:
+            entries[nid] = entry
+            backup_count += 1
+    if backup_count:
+        logger.info(
+            "Loaded bundled TLE cache entries for %d satellite(s)",
+            backup_count,
+        )
+    return entries, retry, blocked_until
+
+
 def save_cache(
     entries: dict[int, CacheEntry],
     retry: dict[int, RetryState],
@@ -228,12 +258,46 @@ def save_cache(
             for nid, r in retry.items()
         },
     }
+    _write_cache_file(TLE_CACHE_PATH, payload, "TLE cache")
+
+
+def _write_cache_file(path: Path, payload: dict, label: str) -> None:
     try:
-        tmp = TLE_CACHE_PATH.with_suffix(".tmp")
+        tmp = path.with_suffix(".tmp")
         tmp.write_text(json.dumps(payload, indent=2))
-        tmp.replace(TLE_CACHE_PATH)
+        tmp.replace(path)
     except Exception as exc:
-        logger.warning("TLE cache write failed: %s", exc)
+        logger.warning("%s write failed: %s", label, exc)
+
+
+def _update_backup_cache(
+    fetched: dict[int, tuple[str, str, str]], fetched_at: float
+) -> None:
+    """Refresh bundled seed entries after successful fetches.
+
+    Retry and request-block state stays in the device-local runtime cache.
+    """
+    if not fetched:
+        return
+
+    entries, _retry, _blocked_until = _load_cache_file(BACKUP_TLE_CACHE_PATH)
+    if BACKUP_TLE_CACHE_PATH.exists() and not entries:
+        logger.warning("Bundled TLE cache was not updated because it is unreadable")
+        return
+
+    for nid, tle in fetched.items():
+        entries[nid] = CacheEntry(fetched_at, tle)
+
+    payload = {
+        "version": CACHE_VERSION,
+        "blocked_until": 0.0,
+        "entries": {
+            str(nid): {"fetched_at": entry.fetched_at, "tle": list(entry.tle)}
+            for nid, entry in entries.items()
+        },
+        "retry": {},
+    }
+    _write_cache_file(BACKUP_TLE_CACHE_PATH, payload, "TLE backup cache")
 
 
 # ---------------------------------------------------------------------------
@@ -267,7 +331,7 @@ class TLEManager:
                 "true",
                 "yes",
             )
-        self.cache_only: bool = cache_only
+        self.cache_only = cache_only
         if self.cache_only:
             logger.warning("TLEManager started in CACHE-ONLY debug mode - no fetches")
 
@@ -568,6 +632,7 @@ class TLEManager:
             blocked_until = self.blocked_until
 
         save_cache(entries_copy, retry_copy, blocked_until)
+        _update_backup_cache(fetched, now)
         if bad_status is None:
             logger.info(
                 "TLE refresh complete - %d/%d due satellite(s) updated",

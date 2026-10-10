@@ -15,6 +15,7 @@ from display.panel_factory import get_panel
 from setup.configuration import CONFIG_PATH, PLATFORM_DATA_DIR, Config
 from setup.logging import setup_logging
 from utilities.cli import dispatch_cli_command
+from utilities.tle_manager import CACHE_ONLY_ENV
 from version import VERSION
 
 panel = get_panel()
@@ -87,6 +88,9 @@ def _render_celestrack_test(panel, canvas, cfg: Config, y):
 
     if not cfg.satellite_tracking_enabled:
         result_text = "OFF"
+        result_colour = ORANGE
+    elif os.environ.get(CACHE_ONLY_ENV, "True") == "True":
+        result_text = "CACHE"
         result_colour = ORANGE
     else:
         working = _check_celestrack()
@@ -164,14 +168,6 @@ def render_splash(
     """
     Render the splash BMP to canvas and swap it onto the display.
     """
-    # Read raw bytes and set pixels manually (works on both Pi 3/4 and Pi 5).
-    splash_path = os.path.join(os.path.dirname(__file__), "assets", "splash.bmp")
-    splash = Image.open(splash_path)
-    pixels = splash.tobytes()
-    for y in range(32):
-        for x in range(64):
-            i = (y * 64 + x) * 3
-            panel.set_pixel(canvas, x, y, pixels[i], pixels[i + 1], pixels[i + 2])
 
     if url is not None and qrcode is not None:
         qr = qrcode.QRCode(

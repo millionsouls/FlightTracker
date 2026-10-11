@@ -193,10 +193,7 @@ def fill_airport_details(route, side: str, *, icao_code: str = "") -> bool:
 
     if not icao and details:
         icao = iata_to_icao_code(route_code)
-    logger.debug(
-        "Airport details for %s (ICAO %s): %s", route_code, icao, details
-    )
-
+    
     changed = False
     if details and icao:
         icao_field = f"{side}_icao"

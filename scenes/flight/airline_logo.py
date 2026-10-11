@@ -225,22 +225,11 @@ def airline_icao_from_flight(flight: Flight) -> str:
     callsign = (flight.icao_callsign or "").strip().upper()
     match = _AIRLINE_CALLSIGN_RE.match(callsign)
     if not match:
-        if callsign:
-            logger.debug(
-                "Callsign %r is not an airline flight identification "
-                "(likely an aircraft registration) - no airline resolved",
-                callsign,
-            )
         return ""
 
     prefix = match.group(1)
     resolved = _BRAND_OVERRIDES.get(prefix, prefix)
     if _is_non_airline(resolved):
-        logger.debug(
-            "Callsign-prefix fallback %r (from %r) rejected: non-commercial operator",
-            resolved,
-            prefix,
-        )
         return ""
     return resolved
 

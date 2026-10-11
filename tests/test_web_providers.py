@@ -225,6 +225,8 @@ class TestParseSettingsFormProviders:
             log_level="INFO",
             weather_refresh_minutes=15,
             weatherapi_key="",
+            satellite_tle_source="celestrak",
+            n2yo_api_key="",
             web_port=8000,
             providers_subtree={},
             provider_settings=lambda pid: {},
@@ -373,6 +375,42 @@ class TestParseSettingsFormProviders:
         out = parse_settings_form({"screen_schedule_advanced_json": "[]"}, self._cfg())
         assert out["screen_schedule_advanced"] == []
 
+    def test_tle_source_selection_is_limited_to_supported_providers(self):
+        from web.app import parse_settings_form
+
+        cfg = self._cfg()
+        assert (
+            parse_settings_form({"satellite_tle_source": "n2yo"}, cfg)[
+                "satellite_tle_source"
+            ]
+            == "n2yo"
+        )
+        assert (
+            parse_settings_form({"satellite_tle_source": "other"}, cfg)[
+                "satellite_tle_source"
+            ]
+            == "celestrak"
+        )
+
+    def test_n2yo_api_key_mask_preserves_clear_and_replace(self):
+        from utilities.lookups.config import MASK
+        from web.app import parse_settings_form
+
+        cfg = self._cfg()
+        cfg.n2yo_api_key = "EXISTING-SECRET"
+        assert parse_settings_form({}, cfg)["n2yo_api_key"] == "EXISTING-SECRET"
+        assert (
+            parse_settings_form({"n2yo_api_key": MASK}, cfg)["n2yo_api_key"]
+            == "EXISTING-SECRET"
+        )
+        assert parse_settings_form({"n2yo_api_key": ""}, cfg)["n2yo_api_key"] == ""
+        assert (
+            parse_settings_form({"n2yo_api_key": " NEW-SECRET "}, cfg)[
+                "n2yo_api_key"
+            ]
+            == "NEW-SECRET"
+        )
+
 
 # ---------------------------------------------------------------------------
 # /debug-config redaction
@@ -386,11 +424,13 @@ class TestDebugConfigRedaction:
         safe = _redact_for_debug(
             {
                 "weatherapi_key": "wkey",
+                "n2yo_api_key": "n2yo-secret",
                 "web_password_hash": "pbkdf2:...",
                 "flight_lat": 55.9,
             }
         )
         assert safe["weatherapi_key"] == "***REDACTED***"
+        assert safe["n2yo_api_key"] == "***REDACTED***"
         assert safe["web_password_hash"] == "***REDACTED***"
         assert safe["flight_lat"] == 55.9
 
@@ -433,6 +473,32 @@ class TestSettingsPageDataMasking:
         assert view["client_id"] == "cid"
         assert view["client_secret"] == MASK
         assert "S3CR3T" not in str(view)
+
+    def test_n2yo_api_key_is_masked_in_settings_data(self):
+        from utilities.lookups.config import MASK
+        from web.app import _provider_ui_data
+
+        class _Config:
+            def as_dict(self):
+                return {
+                    "satellite_tle_source": "n2yo",
+                    "n2yo_api_key": "N2YO-PRIVATE-KEY",
+                }
+
+            @property
+            def n2yo_api_key(self):
+                return "N2YO-PRIVATE-KEY"
+
+            flight_providers = []
+            route_providers = []
+
+            @staticmethod
+            def provider_settings(_provider_id):
+                return {}
+
+        view = _provider_ui_data(_Config())["cfg"]
+        assert view["n2yo_api_key"] == MASK
+        assert "N2YO-PRIVATE-KEY" not in str(view)
 
     def test_mask_token_semantics_through_apply(self):
         from utilities.lookups.config import MASK, apply_submitted_settings

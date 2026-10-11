@@ -704,6 +704,17 @@ def parse_settings_form(form, cfg) -> dict:
             for n in form.get("satellite_norad_ids", "").splitlines()
             if n.strip().isdigit()
         ],
+        "satellite_tle_source": (
+            "n2yo"
+            if str_val(
+                form.get("satellite_tle_source"), cfg.satellite_tle_source
+            ).lower()
+            == "n2yo"
+            else "celestrak"
+        ),
+        "n2yo_api_key": _parse_sensitive_value(
+            form, "n2yo_api_key", cfg.n2yo_api_key
+        ),
         "satellite_min_elevation": max(
             0, min(90, int_val(form.get("satellite_min_elevation"), 20))
         ),
@@ -716,6 +727,18 @@ def parse_settings_form(form, cfg) -> dict:
         ),
         "_version": VERSION,
     }
+
+
+def _parse_sensitive_value(form, key: str, stored: str) -> str:
+    """Apply the settings-page mask/clear/replace contract to a secret."""
+    from utilities.lookups.config import MASK
+
+    if key not in form:
+        return stored
+    submitted = str_val(form.get(key))
+    if submitted == MASK:
+        return stored
+    return submitted.strip()
 
 
 def handle_password_change(form, cfg) -> str:
@@ -898,10 +921,9 @@ def status():
 def _provider_ui_data(cfg) -> dict:
     """Build the provider-facing data for the settings page.
 
-    The browser never sees a sensitive value: secrets are masked in the
-    config snapshot (the web password hash and image API key are
-    excluded entirely), and the
-    per-provider descriptor metadata drives the Data Source page's
+    The browser never sees a sensitive value: the N2YO key is masked in the
+    config snapshot, the web password hash and image API key are excluded,
+    and per-provider descriptor metadata drives the Data Source page's
     provider settings cards.
     """
     from utilities.lookups.config import MASK, provider_settings_view
@@ -910,8 +932,9 @@ def _provider_ui_data(cfg) -> dict:
     cfg_masked = {
         key: value
         for key, value in cfg.as_dict().items()
-        if key not in ("web_password_hash", "image_api_key")
+        if key not in ("web_password_hash", "image_api_key", "n2yo_api_key")
     }
+    cfg_masked["n2yo_api_key"] = MASK if cfg.n2yo_api_key else ""
 
     providers_meta = []
     for pid, spec in PROVIDERS.items():
@@ -1092,7 +1115,7 @@ def settings():
 
             new_data["web_password_hash"] = handle_password_change(form, cfg)
 
-            logger.debug("Parsed settings: %s", new_data)
+            logger.debug("Parsed settings keys: %s", sorted(new_data))
 
             cfg.update(new_data)
             cfg.save()
@@ -1159,6 +1182,7 @@ def airports_json() -> str:
 SENSITIVE_KEYS = {
     "weatherapi_key",
     "image_api_key",
+    "n2yo_api_key",
     "web_password_hash",
 }
 

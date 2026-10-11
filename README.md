@@ -137,7 +137,7 @@ Once you have the URL, open the web UI and go to **Providers** → **Provider Se
 ---
 ## Satellite Tracking
 
-To see when a particular satellite is over head enter its [NORAD ID](https://celestrak.org/SATCAT/search.php) in the device config and it'll let you know where to look, its altitude and speed.
+To see when a particular satellite is over head enter its [NORAD ID](https://celestrak.org/SATCAT/search.php) in the device config and it'll let you know where to look, its altitude and speed. In the web settings under **Sky Monitoring → Satellite Tracking**, choose either CelesTrak or N2YO for TLE updates. CelesTrak is the default; N2YO requires an API key, which is stored as a secret and masked in the settings and debug-config export. The selected source is used when cached TLEs expire (every three days); changing sources does not force an extra request.
 
 ## Running the tracker from the command line
 
@@ -299,6 +299,8 @@ This table is for reference if you've disabled the web interface (`web_interface
 | `callsign_format` | `"icao"` for ICAO callsign (e.g. BAW123), `"iata"` for IATA flight number (e.g. BA123) | `"icao"` |
 | `satellite_tracking_enabled` | Enable satellite pass tracking | `true` |
 | `satellite_norad_ids` | NORAD IDs for tracked satellites | `[25544]` |
+| `satellite_tle_source` | TLE source: `"celestrak"` or `"n2yo"` | `"celestrak"` |
+| `n2yo_api_key` | N2YO API key (secret; configurable in the web settings) | `""` |
 | `satellite_min_elevation` | Minimum elevation for satellite passes | `20` |
 | `satellite_max_count` | Maximum number of satellites to plot at once | `5` |
 | `satellite_timeout_enabled` | Limit how long the satellite scene is shown per pass | `false` |

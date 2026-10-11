@@ -299,7 +299,7 @@ export default defineComponent({
 
       <p class="form-text text-muted small mb-2">
         This feature allows you to track satellites (including the ISS) and display their passes over
-        your location. TLE data is fetched automatically from CelesTrak.
+        your location. Choose one source for automatic TLE updates.
       </p>
 
       <div class="form-check mb-3">
@@ -310,6 +310,41 @@ export default defineComponent({
       </div>
 
       <div v-show="store.config.satellite_tracking_enabled">
+        <h5>TLE Data Source</h5>
+        <div class="mb-3">
+          <div class="form-check">
+            <input type="radio" class="form-check-input" id="tle_source_celestrak"
+                   name="satellite_tle_source" value="celestrak"
+                   v-model="store.config.satellite_tle_source" />
+            <label class="form-check-label small" for="tle_source_celestrak">CelesTrak</label>
+          </div>
+          <div class="form-check">
+            <input type="radio" class="form-check-input" id="tle_source_n2yo"
+                   name="satellite_tle_source" value="n2yo"
+                   v-model="store.config.satellite_tle_source" />
+            <label class="form-check-label small" for="tle_source_n2yo">N2YO.com</label>
+          </div>
+          <div class="form-text text-muted small">
+            Only the selected source is queried. Cached TLEs remain in use until their normal refresh time.
+          </div>
+        </div>
+
+        <div v-if="store.config.satellite_tle_source === 'n2yo'" class="mb-3">
+          <label class="form-label small" for="n2yo_api_key">N2YO API Key</label>
+          <input type="password" class="form-control form-control-sm" id="n2yo_api_key"
+                 name="n2yo_api_key" v-model="store.config.n2yo_api_key"
+                 autocomplete="new-password" />
+          <div class="form-text text-muted small">
+            Get an API key from
+            <a href="https://www.n2yo.com/api/" target="_blank" rel="noopener noreferrer">N2YO.com</a>.
+            The key is stored locally and masked in settings and debug exports.
+          </div>
+          <div v-if="!store.config.n2yo_api_key" class="form-text small text-danger">
+            N2YO is selected but no API key is configured. Cached TLEs will remain available,
+            but refreshes from N2YO will not run until you enter a key.
+          </div>
+        </div>
+
         <h5>Satellites to Track</h5>
         <div class="mb-3">
           <label class="form-label small" for="satellite_norad_ids">NORAD IDs</label>
@@ -319,7 +354,7 @@ export default defineComponent({
           <div class="form-text text-muted small">
             One NORAD catalog ID per line. ISS&nbsp;=&nbsp;25544. Look up IDs on
             <a href="https://celestrak.org/SATCAT/search.php" target="_blank" rel="noopener noreferrer">CelesTrak</a>.
-            TLEs are fetched automatically and cached for 24 hours.
+            TLEs are cached for 3 days before the selected source is queried again.
           </div>
         </div>
 

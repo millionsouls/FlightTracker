@@ -558,8 +558,6 @@ def _icao_plane_type(value: str) -> str:
             char.isalpha() for char in code
         ):
             return code
-
-    logger.debug("Could not resolve a four-character ICAO aircraft type from %r", value)
     return ""
 
 

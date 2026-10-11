@@ -189,6 +189,8 @@ DEFAULT_ROUTE_PROVIDERS: list[dict[str, Any]] = [
 # Satellite tracking
 DEFAULT_SATELLITE_TRACKING_ENABLED = True
 DEFAULT_SATELLITE_NORAD_IDS = [25544]  # ISS (ZARYA) = 25544; celestrak.org for others
+DEFAULT_SATELLITE_TLE_SOURCE = "celestrak"
+DEFAULT_N2YO_API_KEY = ""
 DEFAULT_SATELLITE_MIN_ELEVATION = 20  # degrees - passes peaking below this are ignored
 DEFAULT_SATELLITE_MAX_COUNT = 5  # max simultaneous satellites to plot
 DEFAULT_SATELLITE_TIMEOUT_ENABLED = False  # cap how long the scene is shown per pass
@@ -315,6 +317,8 @@ DEFAULTS: dict[str, Any] = {
     # Satellite tracking
     "satellite_tracking_enabled": DEFAULT_SATELLITE_TRACKING_ENABLED,
     "satellite_norad_ids": DEFAULT_SATELLITE_NORAD_IDS,
+    "satellite_tle_source": DEFAULT_SATELLITE_TLE_SOURCE,
+    "n2yo_api_key": DEFAULT_N2YO_API_KEY,
     "satellite_min_elevation": DEFAULT_SATELLITE_MIN_ELEVATION,
     "satellite_max_count": DEFAULT_SATELLITE_MAX_COUNT,
     "satellite_timeout_enabled": DEFAULT_SATELLITE_TIMEOUT_ENABLED,
@@ -1545,6 +1549,22 @@ class Config:
                     ids.append(int(n))
             return ids
         return list(DEFAULT_SATELLITE_NORAD_IDS)
+
+    @property
+    def satellite_tle_source(self) -> str:
+        """Selected TLE provider: CelesTrak (default) or N2YO."""
+        value = str(
+            self.data_store.get(
+                "satellite_tle_source", DEFAULT_SATELLITE_TLE_SOURCE
+            )
+        ).lower()
+        return value if value in ("celestrak", "n2yo") else DEFAULT_SATELLITE_TLE_SOURCE
+
+    @property
+    def n2yo_api_key(self) -> str:
+        """N2YO API key; stored locally and never exposed to the settings page."""
+        value = self.data_store.get("n2yo_api_key", DEFAULT_N2YO_API_KEY)
+        return str(value).strip() if value is not None else DEFAULT_N2YO_API_KEY
 
     @property
     def satellite_min_elevation(self) -> int:

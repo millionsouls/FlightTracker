@@ -192,14 +192,6 @@ class CallsignBar:
                 BAR_STARTING_POSITION[1] + (FLIGHT_NO_TEXT_HEIGHT // 2),
                 TC(THEME_BG),
             )
-            self.panel.draw_line(
-                canvas,
-                flight_no_text_length + BAR_PADDING,
-                BAR_STARTING_POSITION[1],
-                DATA_INDEX_POSITION[0] - BAR_PADDING - 1,
-                BAR_STARTING_POSITION[1],
-                TC(THEME_DIVIDING_BAR),
-            )
             self.panel.draw_text(
                 canvas,
                 DATA_INDEX_FONT,

@@ -4,6 +4,7 @@ import types
 from datetime import datetime, time
 
 from setup.configuration import (
+    Config,
     _next_backup_path,
     migrate_config,
     migrate_legacy_json,
@@ -21,6 +22,26 @@ from utilities.sun_times import (
 def _t(hour: int, minute: int) -> time:
     """Shorthand for building time objects in schedule tests."""
     return time(hour=hour, minute=minute)
+
+
+def test_satellite_tle_source_configuration_defaults_and_validation():
+    cfg = Config.__new__(Config)
+    cfg.data_store = {}
+
+    assert cfg.satellite_tle_source == "celestrak"
+    assert cfg.n2yo_api_key == ""
+
+    cfg.data_store.update(
+        satellite_tle_source="N2YO",
+        n2yo_api_key="secret",
+    )
+    assert cfg.satellite_tle_source == "n2yo"
+    assert cfg.n2yo_api_key == "secret"
+
+    cfg.data_store["satellite_tle_source"] = "unsupported"
+    cfg.data_store["n2yo_api_key"] = None
+    assert cfg.satellite_tle_source == "celestrak"
+    assert cfg.n2yo_api_key == ""
 
 
 # ---------------------------------------------------------------------------

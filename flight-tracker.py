@@ -15,7 +15,7 @@ from display.panel_factory import get_panel
 from setup.configuration import CONFIG_PATH, PLATFORM_DATA_DIR, Config
 from setup.logging import setup_logging
 from utilities.cli import dispatch_cli_command
-from utilities.tle_manager import CACHE_ONLY_ENV
+from utilities.tle_manager import CACHE_ONLY
 from version import VERSION
 
 panel = get_panel()
@@ -89,7 +89,7 @@ def _render_celestrack_test(panel, canvas, cfg: Config, y):
     if not cfg.satellite_tracking_enabled:
         result_text = "OFF"
         result_colour = ORANGE
-    elif os.environ.get(CACHE_ONLY_ENV, "True") == "True":
+    elif CACHE_ONLY:
         result_text = "CACHE"
         result_colour = ORANGE
     else:

@@ -59,12 +59,13 @@ def test_load_cache_uses_bundled_cache_when_runtime_cache_is_missing(
     assert blocked_until == 0.0
 
 
-def test_cache_only_mode_is_disabled_unless_explicitly_enabled(monkeypatch):
-    monkeypatch.delenv(tle_manager.CACHE_ONLY_ENV, raising=False)
+def test_cache_only_mode_uses_boolean_setting_unless_overridden(monkeypatch):
+    monkeypatch.setattr(tle_manager, "CACHE_ONLY", False)
     assert tle_manager.TLEManager().cache_only is False
 
-    monkeypatch.setenv(tle_manager.CACHE_ONLY_ENV, "1")
+    monkeypatch.setattr(tle_manager, "CACHE_ONLY", True)
     assert tle_manager.TLEManager().cache_only is True
+    assert tle_manager.TLEManager(cache_only=False).cache_only is False
 
 
 def test_successful_fetch_updates_the_runtime_cache(tmp_path, monkeypatch):

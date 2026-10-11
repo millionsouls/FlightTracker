@@ -31,7 +31,6 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 import threading
 import time
 import urllib.error
@@ -48,9 +47,8 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
-# Set TLE_CACHE_ONLY=1 in the environment to start the manager in cache-only
-# debug mode (no network requests at all).
-CACHE_ONLY_ENV = "TLE_CACHE_ONLY"
+# Set to True to start the manager in cache-only debug mode (no network requests).
+CACHE_ONLY = False
 
 TLE_CACHE_TTL = 3 * 86400  # 3 days
 TLE_CACHE_PATH = migrate_legacy_json(
@@ -496,9 +494,9 @@ class TLEManager:
         self.config_hold = False
         self.rejected_key: str | None = None  # N2YO key the server refused
         # Debug: when True, the cache is served as-is and no provider is
-        # contacted.  Defaults to the TLE_CACHE_ONLY environment variable.
+        # contacted. Defaults to the module-level setting unless explicitly set.
         if cache_only is None:
-            cache_only = os.environ.get(CACHE_ONLY_ENV, "").lower() in ("1")
+            cache_only = CACHE_ONLY
         self.cache_only = cache_only
         if self.cache_only:
             logger.warning("TLEManager started in CACHE-ONLY debug mode - no fetches")
